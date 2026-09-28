@@ -1,0 +1,672 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="description" content="Upload a screenshot, pin color-coded sticky notes on it, and export your feedback as JSON — a zero-setup annotation tool for usability and research sessions." />
+<title>Field Notes — Screenshot Annotator</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,900&family=Space+Mono:wght@400;700&family=Newsreader:opsz,wght@6..72,400;6..72,500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<style>
+  :root {
+    --paper:      #f5efe2;
+    --paper-2:    #efe7d6;
+    --paper-edge: #e7dcc4;
+    --ink:        #1c1a17;
+    --ink-dim:    #6f675a;
+    --rule:       #d8ccb2;
+    --thread:     #c0392b;
+    --tack-shadow:rgba(28,26,23,0.28);
+    --display: 'Fraunces', Georgia, serif;
+    --body: 'Newsreader', Georgia, serif;
+    --mono: 'Space Mono', ui-monospace, monospace;
+    --bar-h: 60px;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    font-family: var(--body); color: var(--ink); background-color: var(--paper);
+    background-image: radial-gradient(var(--rule) 1px, transparent 1px);
+    background-size: 22px 22px; background-position: -1px -1px;
+    display: flex; flex-direction: column; height: 100vh; overflow: hidden;
+  }
+  body::before {
+    content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 9999;
+    opacity: 0.5; mix-blend-mode: multiply;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+  }
+
+  /* ---- Top app bar ---- */
+  .appbar {
+    flex: 0 0 auto; min-height: var(--bar-h); display: flex; align-items: center; gap: 18px;
+    padding: 10px 20px; border-bottom: 2px solid var(--ink); background: var(--paper-2);
+    position: relative; z-index: 20; flex-wrap: wrap;
+  }
+  .brand { display: flex; align-items: baseline; gap: 12px; margin-right: 6px; }
+  .brand .kicker {
+    font-family: var(--mono); font-size: 9.5px; letter-spacing: 0.24em; text-transform: uppercase;
+    color: var(--ink-dim); border: 1.5px solid var(--ink); padding: 3px 7px; transform: rotate(-3deg); background: var(--paper); white-space: nowrap;
+  }
+  .brand h1 { font-family: var(--display); font-weight: 900; font-size: 22px; margin: 0; letter-spacing: -0.02em; line-height: 1; }
+  .brand h1 em { font-style: italic; font-weight: 400; }
+
+  .bar-sep { width: 2px; align-self: stretch; background: var(--rule); margin: 4px 0; }
+
+  .bar-field { display: flex; align-items: center; gap: 8px; }
+  .bar-field > label { font-family: var(--mono); font-size: 9.5px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-dim); white-space: nowrap; }
+  .bar-field input[type="text"] {
+    background: var(--paper); border: none; border-bottom: 1.5px solid var(--ink); color: var(--ink);
+    padding: 5px 4px; font-family: var(--body); font-size: 15px; width: 130px;
+  }
+  .bar-field input[type="text"]:focus { outline: none; border-bottom-color: var(--thread); background: #fff; }
+
+  /* legend chips in the bar */
+  .legend { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .chip {
+    display: inline-flex; align-items: center; gap: 6px; padding: 5px 8px; cursor: pointer;
+    background: var(--paper); border: 1.5px solid var(--rule); max-width: 210px;
+    transition: transform .1s, box-shadow .1s;
+  }
+  .chip:hover { transform: translate(-1px,-1px); box-shadow: 2px 2px 0 var(--paper-edge); }
+  .chip.active { border-color: var(--ink); box-shadow: 3px 3px 0 var(--ink); }
+  .chip .swatch { width: 16px; height: 16px; border: 1.5px solid var(--ink); border-radius: 50% 50% 50% 0; transform: rotate(-45deg); padding: 0; cursor: pointer; flex: 0 0 auto; -webkit-appearance: none; appearance: none; }
+  .chip .swatch::-webkit-color-swatch-wrapper { padding: 0; }
+  .chip .swatch::-webkit-color-swatch { border: none; border-radius: 50%; }
+  .chip .title { background: transparent; border: none; color: var(--ink); font-family: var(--body); font-size: 13.5px; padding: 0; width: 100%; min-width: 40px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .chip .title:focus { outline: none; }
+  .chip .del { background: none; border: none; color: var(--ink-dim); cursor: pointer; padding: 0; display: flex; }
+  .chip .del:hover { color: var(--thread); }
+  .addcat {
+    font-family: var(--mono); font-size: 16px; line-height: 1; color: var(--ink-dim);
+    background: none; border: 1.5px dashed var(--ink); padding: 5px 9px; cursor: pointer;
+  }
+  .addcat:hover { color: var(--ink); background: var(--paper); }
+
+  .bar-actions { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+  button.action {
+    display: inline-flex; align-items: center; gap: 6px; cursor: pointer;
+    font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.05em; text-transform: uppercase;
+    background: var(--paper); border: 2px solid var(--ink); color: var(--ink);
+    padding: 7px 11px; box-shadow: 3px 3px 0 var(--ink); transition: transform .08s, box-shadow .08s;
+  }
+  button.action:hover { transform: translate(-1px,-1px); box-shadow: 5px 5px 0 var(--ink); }
+  button.action:active { transform: translate(2px,2px); box-shadow: 0 0 0 var(--ink); }
+  button.action.primary { background: var(--thread); color: #fff; }
+  button.action[aria-pressed="true"] { background: var(--ink); color: var(--paper); }
+  button.action svg { width: 14px; height: 14px; }
+  button.icon { padding: 7px 9px; }
+
+  /* export split-button + dropdown */
+  .export-group { position: relative; display: inline-flex; }
+  .export-main { border-right-width: 1px; }
+  .export-caret { border-left-width: 1px; padding: 7px 8px; box-shadow: 3px 3px 0 var(--ink); }
+  .export-group .export-main { box-shadow: 3px 3px 0 var(--ink); }
+  .export-group:hover .export-main, .export-group:hover .export-caret { transform: none; }
+  .export-menu {
+    position: absolute; top: calc(100% + 6px); right: 0; min-width: 230px; background: var(--paper);
+    border: 2px solid var(--ink); box-shadow: 5px 5px 0 var(--ink); padding: 5px; z-index: 40; display: none;
+  }
+  .export-menu.open { display: block; }
+  .export-menu button {
+    display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; cursor: pointer;
+    background: none; border: none; padding: 9px 10px; color: var(--ink); font-family: var(--body);
+  }
+  .export-menu button:hover { background: var(--paper-2); }
+  .export-menu button svg { width: 17px; height: 17px; flex: 0 0 auto; }
+  .export-menu span { display: flex; flex-direction: column; line-height: 1.2; }
+  .export-menu strong { font-size: 14px; font-weight: 600; }
+  .export-menu em { font-family: var(--mono); font-size: 10px; font-style: normal; letter-spacing: 0.04em; color: var(--ink-dim); text-transform: uppercase; margin-top: 1px; }
+
+  /* ---- Main: single focal stage ---- */
+  .main { flex: 1 1 auto; display: block; min-height: 0; }
+
+  /* Stage — focal point */
+  .stage {
+    position: relative; overflow: auto; min-height: 0; height: 100%;
+    display: flex; align-items: flex-start; justify-content: center;
+    padding: 40px;
+  }
+  .dropzone {
+    align-self: center; border: 2.5px dashed var(--ink); background: var(--paper-2);
+    max-width: 560px; width: 100%; display: grid; place-items: center; text-align: center; padding: 56px 40px;
+    box-shadow: 8px 8px 0 var(--paper-edge); transition: transform .12s, box-shadow .12s;
+  }
+  .dropzone.drag { transform: translate(-2px,-2px); box-shadow: 12px 12px 0 var(--thread); }
+  .dropzone .big { font-family: var(--display); font-weight: 600; font-size: 26px; display: block; margin-bottom: 8px; }
+  .dropzone .small { font-family: var(--mono); font-size: 12px; color: var(--ink-dim); }
+  .dropzone kbd { border: 1.5px solid var(--ink); border-radius: 3px; padding: 1px 6px; font-size: 11px; background: var(--paper); }
+
+  .imgwrap { position: relative; display: inline-block; line-height: 0; max-width: 100%;
+    border: 1px solid var(--ink); box-shadow: 12px 12px 0 var(--paper-edge); background: #fff; }
+  .imgwrap img { max-width: 100%; height: auto; display: block; }
+  .imgwrap.pinning { cursor: crosshair; }
+
+  /* round dot pins */
+  .pin { position: absolute; transform: translate(-50%, -50%); cursor: pointer; width: 18px; height: 18px; z-index: 3; }
+  .pin .head {
+    width: 18px; height: 18px; border-radius: 50%;
+    border: 2px solid #fff; box-shadow: 0 1px 3px var(--tack-shadow); display: grid; place-items: center;
+    transition: transform .12s;
+  }
+  .pin .num { color: #fff; font-family: var(--mono); font-weight: 700; font-size: 10px; line-height: 1; text-shadow: 0 1px 1px rgba(0,0,0,0.3); }
+  .pin.hi { z-index: 7; }
+  .pin.hi .head { outline: 2.5px solid var(--thread); outline-offset: 1.5px; transform: scale(1.18); }
+
+  /* on-image sticky note (repo-style), collapsed by default, expands on hover/open */
+  .sticky {
+    position: absolute; width: 210px; z-index: 4; border-radius: 6px; border: 1px solid;
+    box-shadow: 2px 3px 8px rgba(28,26,23,0.22); overflow: hidden; cursor: grab;
+    transition: box-shadow .12s;
+  }
+  .sticky.dragging { cursor: grabbing; z-index: 8; box-shadow: 4px 8px 16px rgba(28,26,23,0.3); }
+  .sticky.hi { box-shadow: 0 0 0 3px var(--thread), 3px 5px 12px rgba(28,26,23,0.28); z-index: 8; }
+  .sticky.collapsed { width: auto; }
+  .sticky.collapsed .sbody { display: none; }
+  .sticky.collapsed .shead { border-bottom: none; }
+  .sticky.collapsed .stitle, .sticky.collapsed .sdel { display: none; }
+  .sticky .shead { display: flex; align-items: flex-start; gap: 7px; padding: 6px 8px; border-bottom: 1px solid; }
+  .sticky .snum { width: 20px; height: 20px; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); border: 1.5px solid rgba(0,0,0,0.35); display: grid; place-items: center; flex: 0 0 auto; margin-top: 1px; }
+  .sticky .snum span { transform: rotate(45deg); color: #fff; font-family: var(--mono); font-weight: 700; font-size: 11px; }
+  .sticky .stitle { flex: 1; font-family: var(--body); font-size: 12.5px; font-weight: 500; line-height: 1.25; }
+  .sticky .sdel { background: none; border: none; cursor: pointer; padding: 1px; opacity: 0.55; display: flex; }
+  .sticky .sdel:hover { opacity: 1; }
+  .sticky .sbody { padding: 7px 8px; }
+  .sticky textarea {
+    width: 100%; background: transparent; border: none; resize: vertical; min-height: 46px;
+    font-family: var(--body); font-size: 13.5px; line-height: 1.4; padding: 0; color: inherit;
+  }
+  .sticky textarea:focus { outline: none; }
+  .sticky textarea::placeholder { color: currentColor; opacity: 0.45; }
+  .sticky .sby { font-family: var(--mono); font-size: 9px; letter-spacing: 0.06em; margin-top: 5px; opacity: 0.6; text-transform: uppercase; }
+
+  .toast {
+    position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%) translateY(24px) rotate(-1.5deg);
+    background: var(--ink); color: var(--paper); padding: 11px 18px; font-family: var(--mono); font-size: 12px;
+    box-shadow: 4px 4px 0 var(--thread); opacity: 0; pointer-events: none; transition: all .22s cubic-bezier(.2,.9,.3,1.4); z-index: 10000;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0) rotate(-1.5deg); }
+  .hidden { display: none !important; }
+  ::selection { background: var(--thread); color: #fff; }
+</style>
+</head>
+<body>
+<div class="appbar">
+  <div class="brand">
+    <span class="kicker">Field&nbsp;Notes</span>
+    <h1>Screenshot <em>Annotator</em></h1>
+  </div>
+
+  <div class="bar-sep"></div>
+
+  <div class="legend" id="cats"></div>
+  <button class="addcat" id="addCat" title="Add category">+</button>
+
+  <div class="bar-actions">
+    <button class="action icon" id="toggleExpand" title="Expand all notes" aria-pressed="false">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8V5a2 2 0 0 1 2-2h3"/><path d="M16 3h3a2 2 0 0 1 2 2v3"/><path d="M21 16v3a2 2 0 0 1-2 2h-3"/><path d="M8 21H5a2 2 0 0 1-2-2v-3"/></svg>
+    </button>
+    <div class="export-group">
+      <button class="action primary export-main" id="exportZip" title="Export a ZIP with the annotated image, notes JSON, and original screenshot">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>
+        Export ZIP
+      </button>
+      <button class="action primary export-caret" id="exportCaret" aria-haspopup="true" aria-expanded="false" title="More export options">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+      </button>
+      <div class="export-menu" id="exportMenu" role="menu">
+        <button role="menuitem" id="menuZip">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6H10l-2-2H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2Z"/></svg>
+          <span><strong>ZIP bundle</strong><em>image + notes + original</em></span>
+        </button>
+        <button role="menuitem" id="menuJson">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>
+          <span><strong>Notes only</strong><em>JSON</em></span>
+        </button>
+        <button role="menuitem" id="menuPng">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>
+          <span><strong>Annotated image only</strong><em>PNG</em></span>
+        </button>
+      </div>
+    </div>
+    <button class="action icon" id="copyNotes" title="Copy notes to clipboard">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+    </button>
+    <button class="action icon" id="reset" title="Reset (clear image + notes)">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+    </button>
+  </div>
+</div>
+
+<div class="main">
+  <div class="stage" id="stage">
+    <div id="dropzone" class="dropzone">
+      <div>
+        <span class="big">Pin a screenshot to the board</span>
+        <span class="small">drag &amp; drop, upload, or paste <kbd>Ctrl/Cmd</kbd>+<kbd>V</kbd></span>
+        <div style="margin-top:20px;">
+          <button class="action primary" id="uploadBtn">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M17 8l-5-5-5 5"/><path d="M12 3v12"/></svg>
+            Upload image
+          </button>
+        </div>
+      </div>
+    </div>
+    <div id="imgwrap" class="imgwrap hidden">
+      <img id="shot" alt="Screenshot to annotate" />
+    </div>
+    <input type="file" id="fileInput" accept="image/*" class="hidden" />
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(function () {
+  'use strict';
+
+  var LS_KEY = 'screenshot-annotator.session.v1';
+
+  var DEFAULT_CATEGORIES = [
+    { id: 'A', title: 'What did you expect to happen here?', color: '#e0a100' },
+    { id: 'B', title: 'What felt risky or concerning?', color: '#c0392b' },
+    { id: 'C', title: 'What would exceed your expectations here?', color: '#2e7d4f' },
+    { id: 'D', title: 'What emotion did this evoke?', color: '#6d4aff' }
+  ];
+
+  var state = { image: null, categories: null, activeCat: 'A', notes: [] };
+  var $ = function (id) { return document.getElementById(id); };
+  var openId = null;    // sticky expanded by click (stays open)
+  var hoverId = null;   // sticky expanded by hover (transient)
+  var expandAll = false; // when true, all stickies stay expanded
+
+  // A note's sticky sits at (xPct + cardDx, yPct + cardDy) in image-percent space.
+  // Default places the sticky right on top of the pin (slightly up/left so the
+  // pin peeks at the sticky's top edge).
+  var DEFAULT_CARD_DX = -1.2, DEFAULT_CARD_DY = -1.5;
+
+  function save() {
+    try { localStorage.setItem(LS_KEY, JSON.stringify({ image: state.image, categories: state.categories, notes: state.notes })); } catch (e) {}
+  }
+  function load() {
+    try {
+      var raw = localStorage.getItem(LS_KEY);
+      if (raw) { var d = JSON.parse(raw);
+        state.image = d.image || null;
+        state.categories = Array.isArray(d.categories) && d.categories.length ? d.categories : DEFAULT_CATEGORIES.slice();
+        state.notes = Array.isArray(d.notes) ? d.notes : [];
+        state.notes.forEach(function (n) {
+          if (typeof n.cardDx !== 'number') n.cardDx = DEFAULT_CARD_DX;
+          if (typeof n.cardDy !== 'number') n.cardDy = DEFAULT_CARD_DY;
+        });
+      } else { state.categories = DEFAULT_CATEGORIES.slice(); }
+    } catch (e) { state.categories = DEFAULT_CATEGORIES.slice(); }
+    if (!state.activeCat || !catById(state.activeCat)) state.activeCat = state.categories[0].id;
+  }
+  function catById(id) { for (var i = 0; i < state.categories.length; i++) if (state.categories[i].id === id) return state.categories[i]; return null; }
+  function nextCatId() {
+    var used = {}; state.categories.forEach(function (c) { used[c.id] = true; });
+    for (var i = 0; i < 26; i++) { var ch = String.fromCharCode(65 + i); if (!used[ch]) return ch; }
+    return 'C' + Date.now().toString(36).toUpperCase();
+  }
+  var PALETTE = ['#e0a100', '#c0392b', '#2e7d4f', '#6d4aff', '#0e7c9b', '#c2417e', '#1f8a76', '#d2691e'];
+
+  // lighten a hex color toward white by t (0..1) — for the sticky body fill
+  function tint(hex, t) {
+    var h = hex.replace('#',''); if (h.length === 3) h = h.split('').map(function(c){return c+c;}).join('');
+    var r = parseInt(h.slice(0,2),16), g = parseInt(h.slice(2,4),16), b = parseInt(h.slice(4,6),16);
+    r = Math.round(r + (255-r)*t); g = Math.round(g + (255-g)*t); b = Math.round(b + (255-b)*t);
+    return 'rgb(' + r + ',' + g + ',' + b + ')';
+  }
+  // dark ink derived from the category color for readable text on the tint
+  function darken(hex, t) {
+    var h = hex.replace('#',''); if (h.length === 3) h = h.split('').map(function(c){return c+c;}).join('');
+    var r = parseInt(h.slice(0,2),16), g = parseInt(h.slice(2,4),16), b = parseInt(h.slice(4,6),16);
+    r = Math.round(r*(1-t)); g = Math.round(g*(1-t)); b = Math.round(b*(1-t));
+    return 'rgb(' + r + ',' + g + ',' + b + ')';
+  }
+
+  function toast(msg) {
+    var t = $('toast'); t.textContent = msg; t.classList.add('show');
+    clearTimeout(toast._t); toast._t = setTimeout(function () { t.classList.remove('show'); }, 1900);
+  }
+
+  function setImage(dataUrl) {
+    state.image = dataUrl; state.notes = [];
+    $('shot').src = dataUrl; $('dropzone').classList.add('hidden'); $('imgwrap').classList.remove('hidden');
+    save(); render();
+  }
+  function fileToImage(file) {
+    if (!file || !/^image\//.test(file.type)) return;
+    var reader = new FileReader(); reader.onload = function (e) { setImage(e.target.result); }; reader.readAsDataURL(file);
+  }
+
+  function addNoteAt(xPct, yPct) {
+    var note = { id: Date.now() + Math.floor(Math.random() * 1000), catId: state.activeCat,
+      xPct: xPct, yPct: yPct, cardDx: DEFAULT_CARD_DX, cardDy: DEFAULT_CARD_DY, text: '' };
+    state.notes.push(note); openId = note.id; save(); render();
+    var ta = document.querySelector('.sticky[data-id="' + note.id + '"] textarea'); if (ta) ta.focus();
+  }
+  function removeNote(id) { state.notes = state.notes.filter(function (n) { return n.id !== id; }); if (openId === id) openId = null; save(); render(); }
+
+  // Highlight a note (pin + its sticky) without a full re-render, so typing/drag isn't interrupted.
+  function setHighlight(id) {
+    hoverId = id;
+    var active = openId || hoverId;
+    document.querySelectorAll('.pin').forEach(function (p) { p.classList.toggle('hi', +p.getAttribute('data-id') === active); });
+    document.querySelectorAll('.sticky').forEach(function (s) {
+      var sid = +s.getAttribute('data-id');
+      s.classList.toggle('hi', sid === active);
+      s.classList.toggle('collapsed', !(expandAll || sid === openId || sid === hoverId));
+    });
+  }
+
+  // ---- Rendering: pins + on-image stickies ----
+  function render() {
+    var wrap = $('imgwrap');
+    Array.prototype.slice.call(wrap.querySelectorAll('.pin, .sticky')).forEach(function (el) { el.remove(); });
+    if (!state.image) return;
+
+    state.notes.forEach(function (n, idx) {
+      var cat = catById(n.catId) || { title: '(deleted)', color: '#888' };
+      var isOpen = (expandAll || n.id === openId || n.id === hoverId);
+
+      // pin
+      var pin = document.createElement('div');
+      pin.className = 'pin' + (n.id === (openId || hoverId) ? ' hi' : '');
+      pin.setAttribute('data-id', n.id);
+      pin.style.left = n.xPct + '%'; pin.style.top = n.yPct + '%';
+      var head = document.createElement('div'); head.className = 'head'; head.style.background = cat.color;
+      var num = document.createElement('span'); num.className = 'num'; num.textContent = (idx + 1);
+      head.appendChild(num); pin.appendChild(head); pin.title = cat.title || '';
+      pin.addEventListener('mouseenter', function () { setHighlight(n.id); });
+      pin.addEventListener('mouseleave', function () { setHighlight(null); });
+      pin.addEventListener('click', function (e) { e.stopPropagation(); openId = (openId === n.id ? null : n.id); render(); });
+      wrap.appendChild(pin);
+
+      // sticky
+      var body = tint(cat.color, 0.86), border = tint(cat.color, 0.35), ink = darken(cat.color, 0.55);
+      var st = document.createElement('div');
+      st.className = 'sticky' + (isOpen ? '' : ' collapsed') + (n.id === (openId || hoverId) ? ' hi' : '');
+      st.setAttribute('data-id', n.id);
+      st.style.left = (n.xPct + n.cardDx) + '%'; st.style.top = (n.yPct + n.cardDy) + '%';
+      st.style.background = body; st.style.borderColor = border; st.style.color = ink;
+
+      var shead = document.createElement('div'); shead.className = 'shead'; shead.style.borderColor = border;
+      var snum = document.createElement('span'); snum.className = 'snum'; snum.style.background = cat.color;
+      var snumS = document.createElement('span'); snumS.textContent = idx + 1; snum.appendChild(snumS);
+      var stitle = document.createElement('span'); stitle.className = 'stitle'; stitle.textContent = cat.title;
+      var sdel = document.createElement('button'); sdel.className = 'sdel'; sdel.title = 'Delete pin'; sdel.style.color = ink;
+      sdel.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>';
+      sdel.addEventListener('click', function (e) { e.stopPropagation(); removeNote(n.id); });
+      shead.appendChild(snum); shead.appendChild(stitle); shead.appendChild(sdel);
+
+      var sbody = document.createElement('div'); sbody.className = 'sbody';
+      var ta = document.createElement('textarea'); ta.placeholder = 'Add a note…'; ta.value = n.text; ta.style.color = ink;
+      ta.addEventListener('input', function () { n.text = ta.value; save(); });
+      ta.addEventListener('focus', function () { openId = n.id; });
+      sbody.appendChild(ta);
+
+      st.appendChild(shead); st.appendChild(sbody);
+
+      // hover to expand; open (click) keeps it expanded
+      st.addEventListener('mouseenter', function () { setHighlight(n.id); });
+      st.addEventListener('mouseleave', function () { setHighlight(null); });
+      // drag the sticky by its header (not the textarea / delete)
+      shead.addEventListener('pointerdown', function (e) { startStickyDrag(e, n, st); });
+
+      wrap.appendChild(st);
+    });
+  }
+
+  function startStickyDrag(e, n, st) {
+    if (e.target.closest('textarea') || e.target.closest('button')) return;
+    e.preventDefault(); openId = n.id;
+    var wrap = $('imgwrap'); var rect = wrap.getBoundingClientRect();
+    var startX = e.clientX, startY = e.clientY;
+    var origDx = n.cardDx, origDy = n.cardDy;
+    st.classList.add('dragging'); st.setPointerCapture(e.pointerId);
+    function move(ev) {
+      var ddx = ((ev.clientX - startX) / rect.width) * 100;
+      var ddy = ((ev.clientY - startY) / rect.height) * 100;
+      n.cardDx = origDx + ddx; n.cardDy = origDy + ddy;
+      st.style.left = (n.xPct + n.cardDx) + '%'; st.style.top = (n.yPct + n.cardDy) + '%';
+    }
+    function up(ev) {
+      st.classList.remove('dragging');
+      try { st.releasePointerCapture(ev.pointerId); } catch (x) {}
+      st.removeEventListener('pointermove', move); st.removeEventListener('pointerup', up);
+      save();
+    }
+    st.addEventListener('pointermove', move); st.addEventListener('pointerup', up);
+  }
+
+  function renderCats() {
+    var box = $('cats'); box.innerHTML = '';
+    state.categories.forEach(function (c) {
+      var chip = document.createElement('div');
+      chip.className = 'chip' + (c.id === state.activeCat ? ' active' : '');
+      chip.title = c.title;
+      chip.addEventListener('click', function (e) {
+        if (e.target.classList.contains('swatch') || e.target.classList.contains('title')) return;
+        state.activeCat = c.id; renderCats();
+      });
+      var swatch = document.createElement('input');
+      swatch.type = 'color'; swatch.className = 'swatch'; swatch.value = c.color; swatch.title = 'Change color';
+      swatch.addEventListener('input', function () { c.color = swatch.value; save(); renderCats(); render(); });
+      var title = document.createElement('input');
+      title.type = 'text'; title.className = 'title'; title.value = c.title; title.title = c.title;
+      title.addEventListener('input', function () { c.title = title.value; chip.title = title.value; save(); render(); });
+      title.addEventListener('click', function (e) { e.stopPropagation(); });
+      var del = document.createElement('button'); del.className = 'del'; del.title = 'Remove category';
+      del.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>';
+      del.addEventListener('click', function (e) {
+        e.stopPropagation();
+        if (state.categories.length <= 1) { toast('Keep at least one category'); return; }
+        state.categories = state.categories.filter(function (x) { return x.id !== c.id; });
+        if (state.activeCat === c.id) state.activeCat = state.categories[0].id;
+        save(); renderCats(); render();
+      });
+      chip.appendChild(swatch); chip.appendChild(title); chip.appendChild(del); box.appendChild(chip);
+    });
+  }
+
+  function download(filename, blob) {
+    var url = URL.createObjectURL(blob); var a = document.createElement('a'); a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+  }
+  function baseName() { return 'annotations'; }
+  function stamp() { return new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-'); }
+  function buildExport() {
+    return { tool: 'screenshot-annotator', version: 1, exportedAt: new Date().toISOString(),
+      categories: state.categories,
+      notes: state.notes.map(function (n, idx) { var cat = catById(n.catId) || {};
+        return { number: idx + 1, category: cat.title || n.catId, categoryId: n.catId, text: n.text,
+          xPct: +n.xPct.toFixed(2), yPct: +n.yPct.toFixed(2),
+          cardDx: +(n.cardDx || 0).toFixed(2), cardDy: +(n.cardDy || 0).toFixed(2) }; }) };
+  }
+  function notesAsText() {
+    var lines = ['Screenshot annotations', ''];
+    state.notes.forEach(function (n, idx) { var cat = catById(n.catId) || {}; lines.push((idx + 1) + '. [' + (cat.title || n.catId) + '] ' + (n.text || '(no text)')); });
+    return lines.join('\n');
+  }
+  function roundRect(ctx, x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
+  }
+  // wrap text into lines that fit maxW; returns array of lines
+  function wrapText(ctx, text, maxW) {
+    var words = (text || '').split(/\s+/), lines = [], line = '';
+    for (var i = 0; i < words.length; i++) {
+      var test = line ? line + ' ' + words[i] : words[i];
+      if (ctx.measureText(test).width > maxW && line) { lines.push(line); line = words[i]; }
+      else line = test;
+    }
+    if (line) lines.push(line);
+    return lines.length ? lines : [''];
+  }
+
+  // Build the annotated canvas and hand it to cb(canvas). Reused by PNG + ZIP.
+  function renderAnnotatedCanvas(cb) {
+    var img = new Image();
+    img.onload = function () {
+      var W = img.naturalWidth, H = img.naturalHeight;
+      var canvas = document.createElement('canvas'); canvas.width = W; canvas.height = H;
+      var ctx = canvas.getContext('2d'); ctx.drawImage(img, 0, 0);
+
+      var scale = W / 900;                       // size annotations relative to image width
+      var cardW = Math.round(230 * scale);
+      var pad = Math.round(10 * scale);
+      var titleSize = Math.round(14 * scale), bodySize = Math.round(15 * scale);
+      var tack = Math.round(22 * scale);
+
+      var titleFont = '500 ' + titleSize + 'px Newsreader, Georgia, serif';
+      var bodyFont = '400 ' + bodySize + 'px Newsreader, Georgia, serif';
+
+      state.notes.forEach(function (n, idx) {
+        var cat = catById(n.catId) || { title: '(deleted)', color: '#888' };
+        var body = tint(cat.color, 0.86), border = tint(cat.color, 0.35), ink = darken(cat.color, 0.55);
+
+        ctx.font = titleFont;
+        var titleLines = wrapText(ctx, cat.title, cardW - pad * 2 - tack - pad);
+        ctx.font = bodyFont;
+        var bodyLines = wrapText(ctx, n.text || '(no note)', cardW - pad * 2);
+
+        var headH = Math.max(tack + pad, titleLines.length * (titleSize + 4) + pad * 1.5);
+        var bodyH = bodyLines.length * (bodySize + 5) + pad;
+        var cardH = headH + bodyH;
+
+        var x = ((n.xPct + n.cardDx) / 100) * W, y = ((n.yPct + n.cardDy) / 100) * H;
+        x = Math.max(4, Math.min(x, W - cardW - 4));
+        y = Math.max(4, Math.min(y, H - cardH - 4));
+
+        ctx.save();
+        ctx.shadowColor = 'rgba(28,26,23,0.22)'; ctx.shadowBlur = 8 * scale; ctx.shadowOffsetX = 2 * scale; ctx.shadowOffsetY = 3 * scale;
+        ctx.fillStyle = body; roundRect(ctx, x, y, cardW, cardH, 6 * scale); ctx.fill();
+        ctx.restore();
+        ctx.strokeStyle = border; ctx.lineWidth = Math.max(1, 1 * scale); roundRect(ctx, x, y, cardW, cardH, 6 * scale); ctx.stroke();
+        ctx.strokeStyle = border; ctx.beginPath(); ctx.moveTo(x, y + headH); ctx.lineTo(x + cardW, y + headH); ctx.stroke();
+
+        var tx = x + pad + tack / 2, ty = y + pad + tack / 2;
+        ctx.beginPath(); ctx.arc(tx, ty, tack / 2, 0, Math.PI * 2); ctx.fillStyle = cat.color; ctx.fill();
+        ctx.fillStyle = '#fff'; ctx.font = '700 ' + Math.round(tack * 0.55) + 'px "Space Mono", monospace';
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(String(idx + 1), tx, ty + 1);
+
+        ctx.fillStyle = ink; ctx.font = titleFont; ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+        var titleX = x + pad + tack + pad * 0.6, titleY = y + pad;
+        titleLines.forEach(function (ln, i) { ctx.fillText(ln, titleX, titleY + i * (titleSize + 4)); });
+
+        ctx.font = bodyFont;
+        var bx = x + pad, by = y + headH + pad * 0.6;
+        bodyLines.forEach(function (ln, i) { ctx.fillText(ln, bx, by + i * (bodySize + 5)); });
+      });
+
+      cb(canvas);
+    };
+    img.src = state.image;
+  }
+
+  function exportPng() {
+    if (!state.image) { toast('Upload a screenshot first'); return; }
+    renderAnnotatedCanvas(function (canvas) {
+      canvas.toBlob(function (blob) { download('annotated-' + stamp() + '.png', blob); toast('Annotated image saved'); }, 'image/png');
+    });
+  }
+
+  // strip the "data:...;base64," prefix for JSZip
+  function dataUrlToBase64(dataUrl) { return (dataUrl || '').replace(/^data:[^,]+,/, ''); }
+  function imageExt() { var m = /^data:image\/([a-z0-9+]+)/i.exec(state.image || ''); return (m ? m[1] : 'png').replace('jpeg', 'jpg'); }
+
+  function exportZip() {
+    if (!state.image) { toast('Upload a screenshot first'); return; }
+    if (typeof JSZip === 'undefined') { toast('ZIP library not loaded'); return; }
+    renderAnnotatedCanvas(function (canvas) {
+      canvas.toBlob(function (annotatedBlob) {
+        var zip = new JSZip();
+        var base = baseName() + '-' + stamp();
+        zip.file(base + '/notes.json', JSON.stringify(buildExport(), null, 2));
+        zip.file(base + '/annotated.png', annotatedBlob);
+        zip.file(base + '/screenshot-original.' + imageExt(), dataUrlToBase64(state.image), { base64: true });
+        zip.generateAsync({ type: 'blob' }).then(function (content) {
+          download(base + '.zip', content); toast('ZIP exported');
+        });
+      }, 'image/png');
+    });
+  }
+
+  function init() {
+    load();
+    renderCats();
+    if (state.image) { $('shot').src = state.image; $('dropzone').classList.add('hidden'); $('imgwrap').classList.remove('hidden'); }
+    render();
+
+    $('uploadBtn').addEventListener('click', function () { $('fileInput').click(); });
+    $('dropzone').addEventListener('click', function (e) { if (e.target.id === 'dropzone') $('fileInput').click(); });
+    $('fileInput').addEventListener('change', function (e) { if (e.target.files[0]) fileToImage(e.target.files[0]); });
+
+    var dz = $('dropzone');
+    ['dragenter', 'dragover'].forEach(function (ev) { dz.addEventListener(ev, function (e) { e.preventDefault(); dz.classList.add('drag'); }); });
+    ['dragleave', 'drop'].forEach(function (ev) { dz.addEventListener(ev, function (e) { e.preventDefault(); dz.classList.remove('drag'); }); });
+    dz.addEventListener('drop', function (e) { if (e.dataTransfer.files[0]) fileToImage(e.dataTransfer.files[0]); });
+    document.addEventListener('paste', function (e) {
+      var items = (e.clipboardData || {}).items || [];
+      for (var i = 0; i < items.length; i++) { if (items[i].type && items[i].type.indexOf('image') === 0) { fileToImage(items[i].getAsFile()); break; } }
+    });
+
+    $('imgwrap').classList.add('pinning');
+    $('imgwrap').addEventListener('click', function (e) {
+      if (e.target.closest('.pin') || e.target.closest('.sticky')) return;
+      var rect = $('shot').getBoundingClientRect();
+      var xPct = ((e.clientX - rect.left) / rect.width) * 100, yPct = ((e.clientY - rect.top) / rect.height) * 100;
+      if (xPct < 0 || xPct > 100 || yPct < 0 || yPct > 100) return;
+      addNoteAt(xPct, yPct);
+    });
+
+    $('addCat').addEventListener('click', function () {
+      var id = nextCatId(); var color = PALETTE[state.categories.length % PALETTE.length];
+      state.categories.push({ id: id, title: 'New category', color: color }); state.activeCat = id; save(); renderCats();
+    });
+
+    $('toggleExpand').addEventListener('click', function () {
+      expandAll = !expandAll;
+      this.setAttribute('aria-pressed', expandAll ? 'true' : 'false');
+      this.title = expandAll ? 'Collapse all notes' : 'Expand all notes';
+      if (!expandAll) openId = null;
+      render();
+    });
+
+    // ---- Export dropdown ----
+    var menu = $('exportMenu'), caret = $('exportCaret');
+    function closeMenu() { menu.classList.remove('open'); caret.setAttribute('aria-expanded', 'false'); }
+    function toggleMenu() { var open = menu.classList.toggle('open'); caret.setAttribute('aria-expanded', open ? 'true' : 'false'); }
+    caret.addEventListener('click', function (e) { e.stopPropagation(); toggleMenu(); });
+    document.addEventListener('click', function (e) { if (!e.target.closest('.export-group')) closeMenu(); });
+
+    function exportJson() {
+      if (!state.notes.length) { toast('No notes to export yet'); return; }
+      download(baseName() + '-' + stamp() + '.json', new Blob([JSON.stringify(buildExport(), null, 2)], { type: 'application/json' }));
+      toast('Notes exported');
+    }
+    $('exportZip').addEventListener('click', exportZip);
+    $('menuZip').addEventListener('click', function () { closeMenu(); exportZip(); });
+    $('menuJson').addEventListener('click', function () { closeMenu(); exportJson(); });
+    $('menuPng').addEventListener('click', function () { closeMenu(); exportPng(); });
+
+    $('copyNotes').addEventListener('click', function () {
+      if (!state.notes.length) { toast('No notes to copy'); return; }
+      navigator.clipboard.writeText(notesAsText()).then(function () { toast('Notes copied'); }, function () { toast('Copy failed'); });
+    });
+    $('reset').addEventListener('click', function () {
+      if (!confirm('Clear the image and all notes? This cannot be undone.')) return;
+      state.image = null; state.notes = []; openId = null; hoverId = null;
+      $('imgwrap').classList.add('hidden'); $('dropzone').classList.remove('hidden');
+      save(); render();
+    });
+  }
+  document.addEventListener('DOMContentLoaded', init);
+})();
+</script>
+</body>
+</html>
