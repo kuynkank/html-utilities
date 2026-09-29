@@ -8,10 +8,6 @@ A small collection of single-file HTML tools. Each tool is one `.html` file with
 | --- | --- |
 | [Screenshot Notes](screenshot-annotator.html) | Pin color-coded sticky notes on a screenshot and export the feedback as a ZIP, annotated PNG, or JSON. |
 
-## Screenshot Notes
-
-Add a screenshot (drag, upload, or paste), pick a category tag, and click the image to pin a note. Double-click a tag to edit its label and question. Export as a ZIP containing the annotated PNG, `notes.json`, and the original image.
-
 ## Running
 
 Open any `.html` file in a browser, or view them on GitHub Pages at `https://kuynkank.github.io/html-utilities/<tool>.html`.
