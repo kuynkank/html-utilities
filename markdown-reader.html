@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="description" content="Paste or drop a Markdown file to read it rendered, wrapped to a comfortable line length, with adjustable font, size, and width." />
+<title>Markdown Reader</title>
+<script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/dompurify@3.1.6/dist/purify.min.js"></script>
+<style>
+  :root {
+    --bg: #fefefe;
+    --ink: #111317;
+    --ink-dim: #5a5e64;
+    --rule: #dadce0;
+    --soft: #f3f4f5;
+    --ui: "Helvetica Neue", Helvetica, Arial, sans-serif;
+    --serif: Charter, "Bitstream Charter", "Iowan Old Style", "Sitka Text", Cambria, Georgia, serif;
+    --sans: "Helvetica Neue", Helvetica, Arial, sans-serif;
+    --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    --read-font: var(--sans);
+    --read-size: 19px;
+    --measure: 68ch;
+  }
+  * { box-sizing: border-box; }
+  button, input { font-family: inherit; }
+  html, body { margin: 0; }
+  body { background: var(--bg); color: var(--ink); font-family: var(--ui); -webkit-font-smoothing: antialiased; min-height: 100vh; }
+
+  /* ---- header ---- */
+  .bar {
+    position: sticky; top: 0; z-index: 10; background: var(--bg);
+    display: flex; align-items: center; gap: 16px; flex-wrap: wrap; padding: 14px 20px;
+  }
+  .bar.scrolled { box-shadow: 0 1px 0 var(--rule); }
+  .bar h1 { font-size: 20px; font-weight: 400; margin: 0; white-space: nowrap; }
+  .filename { font-size: 13px; color: var(--ink-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; flex: 1; }
+  .controls { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin-left: auto; }
+
+  /* segmented keycaps: joined keys; the selected one stays pressed */
+  .seg { display: inline-flex; align-items: flex-start; margin-bottom: 5px; }
+  .seg button {
+    position: relative; top: 0; cursor: pointer; line-height: 1;
+    font-size: 14px; color: #1a1a1a; background: #fafafa;
+    border: 1px solid #111; border-bottom: none; border-right-width: 0; border-radius: 0;
+    padding: 8px 13px 10px; height: 34px;
+    box-shadow: 0 4px 0 #333, 0 5px 0 #111; transition: box-shadow .06s, top .06s;
+  }
+  .seg button:first-child { border-radius: 4px 0 0 4px; }
+  .seg button:last-child { border-radius: 0 4px 4px 0; border-right-width: 1px; }
+  .seg button:hover { background: #f0f0f0; }
+  .seg button:active { top: 4px; box-shadow: 0 1px 0 #111; }
+  .seg button[aria-pressed="true"],
+  .seg button[aria-pressed="true"]:hover { background: #1a1a1a; color: #fff; }
+  .seg button:focus-visible, .key:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+  .seg .serif { font-family: var(--serif); }
+  .seg .mono { font-family: var(--mono); }
+
+  .key {
+    display: inline-flex; align-items: center; gap: 7px; cursor: pointer; position: relative; top: 0;
+    font-size: 14px; line-height: 1; color: #1a1a1a; background: #fafafa;
+    border: 1px solid #111; border-bottom: none; border-radius: 4px; padding: 8px 14px 10px;
+    box-shadow: 0 4px 0 #333, 0 5px 0 #111; transition: box-shadow .06s, top .06s; margin-bottom: 5px; height: 34px;
+  }
+  .key:hover { background: #f0f0f0; }
+  .key:active { top: 4px; box-shadow: 0 1px 0 #111; }
+  .key svg { width: 16px; height: 16px; }
+  .key.danger:hover { color: #c62828; background: #fdf1f1; }
+  .key:disabled, .key:disabled:hover { cursor: default; color: #a3a6ab; background: #fafafa; border-color: #c8cbcf; box-shadow: 0 4px 0 #d5d8dc, 0 5px 0 #c8cbcf; top: 0; }
+
+  /* ---- empty state ---- */
+  .empty {
+    max-width: 560px; margin: 14vh auto 0; padding: 56px 40px; text-align: center;
+    border: 1px dashed #b9bdc3; border-radius: 4px;
+  }
+  .empty .big { display: block; font-size: 22px; margin-bottom: 8px; }
+  .empty .small { font-size: 14px; color: var(--ink-dim); display: block; margin-bottom: 20px; }
+  .empty kbd { border: 1px solid var(--rule); border-radius: 4px; padding: 1px 6px; font-size: 12px; background: var(--soft); font-family: var(--ui); }
+  body.dragging .empty, body.dragging .doc { outline: 2px dashed var(--ink); outline-offset: 8px; }
+
+  /* ---- reading column ---- */
+  .doc {
+    max-width: var(--measure); margin: 24px auto 120px; padding: 0 24px;
+    font-family: var(--read-font); font-size: var(--read-size); line-height: 1.65;
+    overflow-wrap: break-word; hyphens: auto; text-rendering: optimizeLegibility;
+  }
+  .doc > :first-child { margin-top: 0; }
+  .doc p, .doc ul, .doc ol, .doc blockquote, .doc pre, .doc table, .doc .frontmatter { margin: 0 0 1.1em; }
+  .doc h1, .doc h2, .doc h3, .doc h4, .doc h5, .doc h6 { line-height: 1.25; margin: 2em 0 0.6em; }
+  .doc h1 { font-size: 2em; font-weight: 700; margin-top: 0.4em; letter-spacing: -0.01em; }
+  .doc h2 { font-size: 1.45em; font-weight: 700; padding-top: 0.6em; border-top: 1px solid var(--rule); }
+  .doc h3 { font-size: 1.2em; font-weight: 700; }
+  .doc h4 { font-size: 1em; font-weight: 700; }
+  .doc h5, .doc h6 { font-size: 0.85em; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-dim); }
+  .doc h1 + h2 { border-top: none; padding-top: 0; }
+  .doc a { color: inherit; text-decoration-thickness: 1px; text-underline-offset: 3px; }
+  .doc a:hover { text-decoration-thickness: 2px; }
+  .doc ul, .doc ol { padding-left: 1.4em; }
+  .doc li { margin: 0.3em 0; }
+  .doc li > ul, .doc li > ol { margin: 0.3em 0 0; }
+  .doc li:has(> input[type="checkbox"]) { list-style: none; margin-left: -1.4em; }
+  .doc input[type="checkbox"] { margin: 0 0.5em 0 0; transform: translateY(1px); }
+  .doc blockquote { margin-left: 0; padding: 0.1em 0 0.1em 1.1em; border-left: 3px solid var(--rule); color: var(--ink-dim); }
+  .doc blockquote > :last-child { margin-bottom: 0; }
+  .doc hr { border: none; border-top: 1px solid var(--rule); margin: 2.4em 0; }
+  .doc img { max-width: 100%; height: auto; }
+  .doc code { font-family: var(--mono); font-size: 0.84em; background: var(--soft); border-radius: 3px; padding: 0.1em 0.3em; }
+  .doc pre {
+    font-family: var(--mono); font-size: 0.8em; line-height: 1.55; background: var(--soft);
+    border-radius: 4px; padding: 1em 1.1em; white-space: pre-wrap; overflow-wrap: anywhere;
+  }
+  .doc pre code { background: none; padding: 0; font-size: 1em; }
+  .doc table { border-collapse: collapse; font-size: 0.88em; display: block; overflow-x: auto; max-width: 100%; }
+  .doc th, .doc td { border-bottom: 1px solid var(--rule); padding: 0.45em 0.9em 0.45em 0; text-align: left; vertical-align: top; }
+  .doc th { font-weight: 700; border-bottom-color: var(--ink); }
+  .doc .frontmatter { font-family: var(--mono); font-size: 0.75em; color: var(--ink-dim); border-left: 3px solid var(--rule); padding: 0.2em 0 0.2em 1em; white-space: pre-wrap; }
+
+  .hidden { display: none !important; }
+  ::selection { background: #e2e2e2; }
+
+  @media (max-width: 720px) {
+    .bar { padding: 12px 16px; gap: 10px; }
+    .filename { display: none; }
+    .controls { margin-left: 0; width: 100%; }
+    .doc { padding: 0 16px; }
+    .empty { margin: 8vh 16px 0; padding: 40px 20px; }
+  }
+</style>
+</head>
+<body>
+<header class="bar" id="bar">
+  <h1>Markdown Reader</h1>
+  <span class="filename" id="filename"></span>
+  <div class="controls">
+    <div class="seg" role="group" aria-label="Font">
+      <button class="serif" data-font="serif" title="Serif">Serif</button>
+      <button data-font="sans" title="Sans serif">Sans</button>
+      <button class="mono" data-font="mono" title="Monospace">Mono</button>
+    </div>
+    <div class="seg" role="group" aria-label="Text size">
+      <button data-size="-1" title="Smaller text">A−</button>
+      <button data-size="1" title="Larger text">A+</button>
+    </div>
+    <div class="seg" role="group" aria-label="Line width">
+      <button data-width="58" title="Narrow column">Narrow</button>
+      <button data-width="68" title="Medium column">Medium</button>
+      <button data-width="84" title="Wide column">Wide</button>
+    </div>
+    <button class="key" id="openBtn" title="Open a Markdown file">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>
+      Open
+    </button>
+    <button class="key danger" id="clearBtn" title="Clear the current document" disabled>
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+      Clear
+    </button>
+  </div>
+</header>
+
+<main>
+  <div class="empty" id="empty">
+    <span class="big">Read a Markdown file</span>
+    <span class="small">drag &amp; drop, open, or paste <kbd>Ctrl/Cmd</kbd>+<kbd>V</kbd></span>
+    <button class="key" id="openBtn2">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>
+      Open file
+    </button>
+  </div>
+  <article class="doc hidden" id="doc"></article>
+</main>
+<input type="file" id="fileInput" accept=".md,.markdown,.mdx,.txt,text/markdown,text/plain" class="hidden" />
+
+<script>
+(function () {
+  'use strict';
+  var LS_KEY = 'markdown-reader.session.v1';
+  var $ = function (id) { return document.getElementById(id); };
+  var FONTS = { serif: 'var(--serif)', sans: 'var(--sans)', mono: 'var(--mono)' };
+  var SIZES = [15, 16, 17, 18, 19, 20, 22, 24];
+  var state = { font: 'sans', size: 19, width: 68, text: '', name: '' };
+
+  function save() { try { localStorage.setItem(LS_KEY, JSON.stringify(state)); } catch (e) {} }
+  function load() {
+    try { var d = JSON.parse(localStorage.getItem(LS_KEY) || 'null'); if (d) Object.keys(state).forEach(function (k) { if (d[k] != null) state[k] = d[k]; }); } catch (e) {}
+  }
+
+  function applySettings() {
+    var root = document.documentElement.style;
+    root.setProperty('--read-font', FONTS[state.font] || FONTS.serif);
+    root.setProperty('--read-size', state.size + 'px');
+    root.setProperty('--measure', state.width + 'ch');
+    document.querySelectorAll('[data-font]').forEach(function (b) { b.setAttribute('aria-pressed', b.dataset.font === state.font); });
+    document.querySelectorAll('[data-width]').forEach(function (b) { b.setAttribute('aria-pressed', +b.dataset.width === state.width); });
+    // mono is already wide per character; keep the column from getting too long
+    if (state.font === 'mono') root.setProperty('--measure', Math.round(state.width * 1.05) + 'ch');
+  }
+
+  function escapeHtml(s) { return s.replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+
+  function render() {
+    var has = !!state.text;
+    $('empty').classList.toggle('hidden', has);
+    $('doc').classList.toggle('hidden', !has);
+    $('clearBtn').disabled = !has;
+    $('filename').textContent = state.name || '';
+    document.title = state.name ? state.name + ' — Markdown Reader' : 'Markdown Reader';
+    if (!has) { $('doc').innerHTML = ''; return; }
+
+    var src = state.text.replace(/^﻿/, '');
+    var front = '';
+    var m = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?/.exec(src);
+    if (m) { front = '<div class="frontmatter">' + escapeHtml(m[1]) + '</div>'; src = src.slice(m[0].length); }
+
+    var html = (window.marked ? marked.parse(src, { gfm: true, breaks: false }) : '<pre>' + escapeHtml(src) + '</pre>');
+    if (window.DOMPurify) html = DOMPurify.sanitize(html);
+    $('doc').innerHTML = front + html;
+    $('doc').querySelectorAll('a[href^="http"]').forEach(function (a) { a.target = '_blank'; a.rel = 'noopener'; });
+    window.scrollTo(0, 0);
+  }
+
+  function setDoc(text, name) {
+    state.text = text || ''; state.name = name || '';
+    try { save(); } catch (e) {}
+    render();
+  }
+  function readFile(file) {
+    if (!file) return;
+    var r = new FileReader();
+    r.onload = function () { setDoc(String(r.result), file.name); };
+    r.readAsText(file);
+  }
+
+  function init() {
+    load(); applySettings(); render();
+
+    document.querySelectorAll('[data-font]').forEach(function (b) {
+      b.addEventListener('click', function () { state.font = b.dataset.font; applySettings(); save(); });
+    });
+    document.querySelectorAll('[data-width]').forEach(function (b) {
+      b.addEventListener('click', function () { state.width = +b.dataset.width; applySettings(); save(); });
+    });
+    document.querySelectorAll('[data-size]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var i = SIZES.indexOf(state.size); if (i < 0) i = 4;
+        i = Math.max(0, Math.min(SIZES.length - 1, i + (+b.dataset.size)));
+        state.size = SIZES[i]; applySettings(); save();
+      });
+    });
+
+    [$('openBtn'), $('openBtn2')].forEach(function (b) { b.addEventListener('click', function () { $('fileInput').click(); }); });
+    $('fileInput').addEventListener('change', function (e) { readFile(e.target.files[0]); e.target.value = ''; });
+    $('clearBtn').addEventListener('click', function () { setDoc('', ''); });
+
+    // paste anywhere
+    document.addEventListener('paste', function (e) {
+      var cd = e.clipboardData; if (!cd) return;
+      if (cd.files && cd.files[0]) { e.preventDefault(); readFile(cd.files[0]); return; }
+      var t = cd.getData('text/plain');
+      if (t && t.trim()) { e.preventDefault(); setDoc(t, 'Pasted text'); }
+    });
+
+    // drop anywhere
+    var depth = 0;
+    document.addEventListener('dragenter', function (e) { e.preventDefault(); depth++; document.body.classList.add('dragging'); });
+    document.addEventListener('dragleave', function () { depth = Math.max(0, depth - 1); if (!depth) document.body.classList.remove('dragging'); });
+    document.addEventListener('dragover', function (e) { e.preventDefault(); });
+    document.addEventListener('drop', function (e) {
+      e.preventDefault(); depth = 0; document.body.classList.remove('dragging');
+      var f = e.dataTransfer.files && e.dataTransfer.files[0];
+      if (f) readFile(f);
+      else { var t = e.dataTransfer.getData('text/plain'); if (t) setDoc(t, 'Dropped text'); }
+    });
+
+    window.addEventListener('scroll', function () { $('bar').classList.toggle('scrolled', window.scrollY > 4); }, { passive: true });
+  }
+  document.addEventListener('DOMContentLoaded', init);
+})();
+</script>
+</body>
+</html>
