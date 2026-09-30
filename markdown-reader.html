@@ -34,7 +34,16 @@
   }
   .bar.scrolled { box-shadow: 0 1px 0 var(--rule); }
   .bar h1 { font-size: 20px; font-weight: 400; margin: 0; white-space: nowrap; }
-  .filename { font-size: 13px; color: var(--ink-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; flex: 1; }
+  .title-wrap { flex: 1; min-width: 0; display: flex; }
+  .filename {
+    display: inline-flex; align-items: center; gap: 7px; max-width: 100%; min-width: 0;
+    font-size: 14px; color: var(--ink); background: #eeeff1;
+    border: none; border-radius: 4px; padding: 6px 10px;
+  }
+  .filename svg { width: 14px; height: 14px; flex: 0 0 auto; color: var(--ink-dim); }
+  .filename span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .key kbd { font-family: inherit; font-size: 11px; line-height: 1; color: var(--ink-dim); background: #eeeff1; border-radius: 3px; padding: 3px 5px; margin-left: 2px; position: relative; top: 1px; }
+  .key:disabled kbd { color: inherit; background: #f3f4f5; }
   .controls { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin-left: auto; }
 
   /* segmented keycaps: joined keys; the selected one stays pressed */
@@ -120,7 +129,9 @@
 
   @media (max-width: 720px) {
     .bar { padding: 12px 16px; gap: 10px; }
-    .filename { display: none; }
+    .title-wrap { flex-basis: 100%; order: 2; }
+    .controls { order: 3; }
+    .key kbd { display: none; }
     .controls { margin-left: 0; width: 100%; }
     .doc { padding: 0 16px; }
     .empty { margin: 8vh 16px 0; padding: 40px 20px; }
@@ -130,7 +141,10 @@
 <body>
 <header class="bar" id="bar">
   <h1>Markdown Reader</h1>
-  <span class="filename" id="filename"></span>
+  <div class="title-wrap"><span class="filename hidden" id="filename" title="">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>
+    <span id="filenameText"></span>
+  </span></div>
   <div class="controls">
     <div class="seg" role="group" aria-label="Font">
       <button class="serif" data-font="serif" title="Serif">Serif</button>
@@ -148,11 +162,11 @@
     </div>
     <button class="key" id="openBtn" title="Open a Markdown file">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>
-      Open
+      Open <kbd class="sc" data-keys="O"></kbd>
     </button>
     <button class="key danger" id="clearBtn" title="Clear the current document" disabled>
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
-      Clear
+      Clear <kbd class="sc" data-keys="⌫"></kbd>
     </button>
   </div>
 </header>
@@ -202,7 +216,9 @@
     $('empty').classList.toggle('hidden', has);
     $('doc').classList.toggle('hidden', !has);
     $('clearBtn').disabled = !has;
-    $('filename').textContent = state.name || '';
+    $('filenameText').textContent = state.name || '';
+    $('filename').title = state.name || '';
+    $('filename').classList.toggle('hidden', !has);
     document.title = state.name ? state.name + ' — Markdown Reader' : 'Markdown Reader';
     if (!has) { $('doc').innerHTML = ''; return; }
 
@@ -250,6 +266,19 @@
     [$('openBtn'), $('openBtn2')].forEach(function (b) { b.addEventListener('click', function () { $('fileInput').click(); }); });
     $('fileInput').addEventListener('change', function (e) { readFile(e.target.files[0]); e.target.value = ''; });
     $('clearBtn').addEventListener('click', function () { setDoc('', ''); });
+
+    // keyboard shortcuts: Cmd/Ctrl+O open, Cmd/Ctrl+Backspace clear
+    var isMac = /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
+    var mod = isMac ? '⌘' : 'Ctrl+';
+    document.querySelectorAll('kbd.sc').forEach(function (k) { k.textContent = mod + (k.dataset.keys === '⌫' && !isMac ? 'Backspace' : k.dataset.keys); });
+    $('openBtn').title = 'Open a Markdown file (' + mod + 'O)';
+    $('clearBtn').title = 'Clear the current document (' + mod + (isMac ? '⌫' : 'Backspace') + ')';
+    document.addEventListener('keydown', function (e) {
+      if (!(e.metaKey || e.ctrlKey) || e.altKey || e.shiftKey) return;
+      var k = e.key.toLowerCase();
+      if (k === 'o') { e.preventDefault(); $('fileInput').click(); }
+      else if ((k === 'backspace' || k === 'delete') && state.text) { e.preventDefault(); setDoc('', ''); }
+    });
 
     // paste anywhere
     document.addEventListener('paste', function (e) {
