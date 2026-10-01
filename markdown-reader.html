@@ -167,6 +167,13 @@
   .side-top { display: flex; align-items: center; gap: 10px; padding: 14px 12px 6px; min-height: 64px; }
   .side-body { display: flex; flex-direction: column; flex: 1; min-height: 0; width: var(--rail-open); }
   body:not(.side-open) .side-body, body:not(.side-open) .side-top .side-label { display: none; }
+  .ghost {
+    display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; flex: 0 0 auto;
+    border: none; background: none; color: var(--ink-dim); border-radius: 4px; cursor: pointer; padding: 0;
+  }
+  .ghost:hover { background: var(--badge); color: var(--ink); }
+  .ghost:focus-visible { outline: 2px solid var(--ink); outline-offset: 1px; }
+  .ghost svg { width: 18px; height: 18px; }
   .side-label { display: flex; align-items: baseline; justify-content: space-between; flex: 1; padding-right: 4px; }
   .side-label h2 { font-size: 13px; font-weight: 500; margin: 0; color: var(--ink-dim); letter-spacing: 0.02em; }
   .side-label .count { font-size: 12px; color: var(--ink-dim); }
@@ -182,7 +189,7 @@
   .hist li { position: relative; }
   .hist .item {
     display: flex; gap: 10px; align-items: flex-start; width: 100%; text-align: left; cursor: pointer;
-    background: none; border: none; border-radius: 4px; padding: 8px 30px 8px 8px; color: var(--ink);
+    background: none; border: none; border-radius: 4px; padding: 8px 58px 8px 8px; color: var(--ink);
   }
   .hist .item:hover { background: var(--soft); }
   .hist li.current .item { background: var(--badge); }
@@ -190,13 +197,19 @@
   .hist .txt { display: flex; flex-direction: column; min-width: 0; gap: 2px; }
   .hist .nm { font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .hist .meta { font-size: 12px; color: var(--ink-dim); }
-  .hist .rm {
-    position: absolute; right: 4px; top: 7px; border: none; background: none; color: var(--ink-dim);
+  .hist .acts { position: absolute; right: 4px; top: 7px; display: flex; gap: 2px; }
+  .hist .act {
+    border: none; background: none; color: var(--ink-dim);
     padding: 4px; border-radius: 4px; cursor: pointer; display: flex; opacity: 0;
   }
-  .hist li:hover .rm, .hist .rm:focus-visible { opacity: 1; }
+  .hist li:hover .act, .hist .act:focus-visible, .hist .pin[aria-pressed="true"] { opacity: 1; }
+  .hist .act:hover { color: var(--ink); background: var(--badge); }
   .hist .rm:hover { color: var(--danger); background: var(--danger-bg); }
-  .hist .rm svg { width: 13px; height: 13px; }
+  .hist .pin[aria-pressed="true"] { color: var(--ink); }
+  .hist .pin[aria-pressed="true"] svg { fill: currentColor; }
+  .hist .act svg { width: 13px; height: 13px; }
+  .hist .sec { font-size: 11px; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-dim); padding: 12px 8px 4px; }
+  .hist .sec:first-child { padding-top: 4px; }
   .side-empty { font-size: 13px; color: var(--ink-dim); padding: 8px 16px; margin: 0; flex: 1; }
   .side-foot { padding: 10px 16px 14px; border-top: 1px solid var(--rule); }
   .linkbtn { background: none; border: none; padding: 0; font-size: 13px; color: var(--ink-dim); cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
@@ -266,7 +279,7 @@
 
 <aside class="side" id="side" aria-label="History">
   <div class="side-top">
-    <button class="key icon" id="sideBtn" title="Show history" aria-label="Toggle history" aria-expanded="false" aria-controls="side">
+    <button class="ghost" id="sideBtn" title="Show history" aria-label="Toggle history" aria-expanded="false" aria-controls="side">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18"/></svg>
     </button>
     <div class="side-label"><h2>History</h2><span class="count" id="histCount"></span></div>
@@ -303,6 +316,7 @@
   var history = [];
   var ICON_FILE = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>';
   var ICON_PASTE = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/></svg>';
+  var ICON_PIN = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5"/><path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z"/></svg>';
   var ICON_X = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>';
 
   function loadHistory() { try { history = JSON.parse(localStorage.getItem(HKEY) || '[]') || []; } catch (e) { history = []; } }
@@ -310,8 +324,16 @@
   function saveHistory() {
     while (true) {
       try { localStorage.setItem(HKEY, JSON.stringify(history)); return; }
-      catch (e) { if (history.length <= 1) return; history.pop(); }
+      catch (e) { if (!dropOldest()) return; }
     }
+  }
+  // remove the oldest entry that isn't the open document; false if none left.
+  // pinning is only for display: pinned items age out like any other.
+  function dropOldest() {
+    for (var i = history.length - 1; i >= 0; i--) {
+      if (history[i].id !== state.currentId) { history.splice(i, 1); return true; }
+    }
+    return false;
   }
   function titleFromText(t) {
     var h = /^#{1,6}\s+(.+)$/m.exec(t);
@@ -324,7 +346,7 @@
     if (found) { history.splice(history.indexOf(found), 1); found.text = text; found.name = name; found.at = Date.now(); }
     else found = { id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), name: name, kind: kind, text: text, at: Date.now() };
     history.unshift(found);
-    if (history.length > HMAX) history.length = HMAX;
+    while (history.length > HMAX && dropOldest()) {}
     saveHistory();
     return found.id;
   }
@@ -336,24 +358,39 @@
     if (s < 172800) return 'yesterday';
     return new Date(t).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
   }
+  function historyItem(h) {
+    var li = document.createElement('li'); if (h.id === state.currentId) li.className = 'current';
+    var b = document.createElement('button'); b.className = 'item'; b.title = h.name;
+    b.innerHTML = (h.kind === 'file' ? ICON_FILE : ICON_PASTE) + '<span class="txt"><span class="nm"></span><span class="meta"></span></span>';
+    b.querySelector('.nm').textContent = h.name;
+    b.querySelector('.meta').textContent = (h.kind === 'file' ? 'File' : 'Pasted') + ' · ' + ago(h.at);
+    b.addEventListener('click', function () {
+      state.currentId = h.id; setDoc(h.text, h.name);
+      if (window.innerWidth < 1000) setSide(false);
+    });
+    var acts = document.createElement('div'); acts.className = 'acts';
+    var pin = document.createElement('button'); pin.className = 'act pin'; pin.innerHTML = ICON_PIN;
+    pin.setAttribute('aria-pressed', !!h.pinned);
+    pin.title = h.pinned ? 'Unpin' : 'Pin to top';
+    pin.addEventListener('click', function () { h.pinned = !h.pinned; saveHistory(); renderHistory(); });
+    var rm = document.createElement('button'); rm.className = 'act rm'; rm.title = 'Remove from history'; rm.innerHTML = ICON_X;
+    rm.addEventListener('click', function () {
+      history = history.filter(function (x) { return x.id !== h.id; }); saveHistory(); renderHistory();
+    });
+    acts.appendChild(pin); acts.appendChild(rm);
+    li.appendChild(b); li.appendChild(acts);
+    return li;
+  }
   function renderHistory() {
     var ul = $('hist'); ul.innerHTML = '';
-    history.forEach(function (h) {
-      var li = document.createElement('li'); if (h.id === state.currentId) li.className = 'current';
-      var b = document.createElement('button'); b.className = 'item'; b.title = h.name;
-      b.innerHTML = (h.kind === 'file' ? ICON_FILE : ICON_PASTE) + '<span class="txt"><span class="nm"></span><span class="meta"></span></span>';
-      b.querySelector('.nm').textContent = h.name;
-      b.querySelector('.meta').textContent = (h.kind === 'file' ? 'File' : 'Pasted') + ' · ' + ago(h.at);
-      b.addEventListener('click', function () {
-        state.currentId = h.id; setDoc(h.text, h.name);
-        if (window.innerWidth < 1000) setSide(false);
-      });
-      var rm = document.createElement('button'); rm.className = 'rm'; rm.title = 'Remove from history'; rm.innerHTML = ICON_X;
-      rm.addEventListener('click', function () {
-        history = history.filter(function (x) { return x.id !== h.id; }); saveHistory(); renderHistory();
-      });
-      li.appendChild(b); li.appendChild(rm); ul.appendChild(li);
-    });
+    var pinned = history.filter(function (h) { return h.pinned; });
+    var recent = history.filter(function (h) { return !h.pinned; });
+    function section(label, items) {
+      if (!items.length) return;
+      if (pinned.length) { var sec = document.createElement('li'); sec.className = 'sec'; sec.textContent = label; ul.appendChild(sec); }
+      items.forEach(function (h) { ul.appendChild(historyItem(h)); });
+    }
+    section('Pinned', pinned); section('Recent', recent);
     $('histEmpty').classList.toggle('hidden', history.length > 0);
     ul.classList.toggle('hidden', !history.length);
     $('histCount').textContent = history.length ? history.length : '';
