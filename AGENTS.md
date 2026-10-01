@@ -4,9 +4,8 @@ Guidance for AI agents building or editing tools in this repo.
 
 ## What this is
 
-A collection of single-file HTML tools, hosted on GitHub Pages from the `master` branch.
+A collection of single-file HTML tools.
 
-Live at: https://kuynkank.github.io/html-utilities/
 
 ## Technical rules
 

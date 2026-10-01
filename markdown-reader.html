@@ -193,8 +193,8 @@
   .side-mini { display: none; padding: 6px 12px; }
   #openIcon { width: 36px; justify-content: center; padding: 8px 0 10px; }
   body:not(.side-open) .side-mini { display: block; }
-  .side-open { padding: 6px 12px 10px; }
-  .side-open .key { width: 100%; justify-content: center; }
+  .side-action { padding: 6px 12px 10px; }
+  .side-action .key { width: 100%; justify-content: center; }
   .side-label { display: flex; align-items: baseline; justify-content: space-between; flex: 1; padding-right: 4px; }
   .side-label h2 { font-size: 13px; font-weight: 500; margin: 0; color: var(--ink-dim); letter-spacing: 0.02em; }
   .side-label .count { font-size: 12px; color: var(--ink-dim); }
@@ -319,7 +319,7 @@
     </button>
   </div>
   <div class="side-body">
-    <div class="side-open">
+    <div class="side-action">
       <button class="key" id="openBtn" title="Open a Markdown file">
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>
         Open file <kbd class="sc" data-keys="O"></kbd>
@@ -337,7 +337,7 @@
     <span class="small">drag &amp; drop, open, or paste <kbd>Ctrl/Cmd</kbd>+<kbd>V</kbd></span>
     <button class="key" id="openBtn2">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>
-      Open file
+      Open file <kbd class="sc" data-keys="O"></kbd>
     </button>
   </div>
   <article class="doc hidden" id="doc"></article>
