@@ -15,6 +15,22 @@
     --ink-dim: #5a5e64;
     --rule: #dadce0;
     --soft: #f3f4f5;
+    --badge: #eeeff1;
+    --dash: #b9bdc3;
+    --key-face: #fafafa;
+    --key-hover: #f0f0f0;
+    --key-ink: #1a1a1a;
+    --key-edge: #111;
+    --key-base: #333;
+    --sel-bg: #1a1a1a;
+    --sel-ink: #fff;
+    --danger: #c62828;
+    --danger-bg: #fdf1f1;
+    --dis-ink: #a3a6ab;
+    --dis-edge: #c8cbcf;
+    --dis-base: #d5d8dc;
+    --selection: #e2e2e2;
+    color-scheme: light;
     --ui: "Helvetica Neue", Helvetica, Arial, sans-serif;
     --serif: Charter, "Bitstream Charter", "Iowan Old Style", "Sitka Text", Cambria, Georgia, serif;
     --sans: "Helvetica Neue", Helvetica, Arial, sans-serif;
@@ -22,6 +38,29 @@
     --read-font: var(--sans);
     --read-size: 19px;
     --measure: 68ch;
+  }
+  :root[data-theme="dark"] {
+    --bg: #17181b;
+    --ink: #e4e5e7;
+    --ink-dim: #9da1a7;
+    --rule: #34363b;
+    --soft: #212328;
+    --badge: #2a2c31;
+    --dash: #4a4d53;
+    --key-face: #2b2d32;
+    --key-hover: #34373d;
+    --key-ink: #e4e5e7;
+    --key-edge: #5a5d63;
+    --key-base: #3e4147;
+    --sel-bg: #e4e5e7;
+    --sel-ink: #17181b;
+    --danger: #ff8a80;
+    --danger-bg: #3a2426;
+    --dis-ink: #62666c;
+    --dis-edge: #3a3c41;
+    --dis-base: #2a2c30;
+    --selection: #3d4047;
+    color-scheme: dark;
   }
   * { box-sizing: border-box; }
   button, input { font-family: inherit; }
@@ -38,50 +77,51 @@
   .title-wrap { flex: 1; min-width: 0; display: flex; }
   .filename {
     display: inline-flex; align-items: center; gap: 7px; max-width: 100%; min-width: 0;
-    font-size: 14px; color: var(--ink); background: #eeeff1;
+    font-size: 14px; color: var(--ink); background: var(--badge);
     border: none; border-radius: 4px; padding: 6px 10px;
   }
   .filename svg { width: 14px; height: 14px; flex: 0 0 auto; color: var(--ink-dim); }
   .filename span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .key kbd { font-family: inherit; font-size: 11px; line-height: 1; color: var(--ink-dim); background: #eeeff1; border-radius: 3px; padding: 3px 5px; margin-left: 2px; position: relative; top: 1px; }
-  .key:disabled kbd { color: inherit; background: #f3f4f5; }
+  .key kbd { font-family: inherit; font-size: 11px; line-height: 1; color: var(--ink-dim); background: var(--badge); border-radius: 3px; padding: 3px 5px; margin-left: 2px; position: relative; top: 1px; }
+  .key:disabled kbd { color: inherit; background: var(--soft); }
   .controls { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin-left: auto; }
 
   /* segmented keycaps: joined keys; the selected one stays pressed */
   .seg { display: inline-flex; align-items: flex-start; margin-bottom: 5px; }
   .seg button {
     position: relative; top: 0; cursor: pointer; line-height: 1;
-    font-size: 14px; color: #1a1a1a; background: #fafafa;
-    border: 1px solid #111; border-bottom: none; border-right-width: 0; border-radius: 0;
+    font-size: 14px; color: var(--key-ink); background: var(--key-face);
+    border: 1px solid var(--key-edge); border-bottom: none; border-right-width: 0; border-radius: 0;
     padding: 8px 13px 10px; height: 34px;
-    box-shadow: 0 4px 0 #333, 0 5px 0 #111; transition: box-shadow .06s, top .06s;
+    box-shadow: 0 4px 0 var(--key-base), 0 5px 0 var(--key-edge); transition: box-shadow .06s, top .06s;
   }
   .seg button:first-child { border-radius: 4px 0 0 4px; }
   .seg button:last-child { border-radius: 0 4px 4px 0; border-right-width: 1px; }
-  .seg button:hover { background: #f0f0f0; }
-  .seg button:active { top: 4px; box-shadow: 0 1px 0 #111; }
+  .seg button:hover { background: var(--key-hover); }
+  .seg button:active { top: 4px; box-shadow: 0 1px 0 var(--key-edge); }
   .seg button[aria-pressed="true"],
-  .seg button[aria-pressed="true"]:hover { background: #1a1a1a; color: #fff; }
+  .seg button[aria-pressed="true"]:hover { background: var(--sel-bg); color: var(--sel-ink); }
   .seg button:focus-visible, .key:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
   .seg .serif { font-family: var(--serif); }
   .seg .mono { font-family: var(--mono); }
 
   .key {
     display: inline-flex; align-items: center; gap: 7px; cursor: pointer; position: relative; top: 0;
-    font-size: 14px; line-height: 1; color: #1a1a1a; background: #fafafa;
-    border: 1px solid #111; border-bottom: none; border-radius: 4px; padding: 8px 14px 10px;
-    box-shadow: 0 4px 0 #333, 0 5px 0 #111; transition: box-shadow .06s, top .06s; margin-bottom: 5px; height: 34px;
+    font-size: 14px; line-height: 1; color: var(--key-ink); background: var(--key-face);
+    border: 1px solid var(--key-edge); border-bottom: none; border-radius: 4px; padding: 8px 14px 10px;
+    box-shadow: 0 4px 0 var(--key-base), 0 5px 0 var(--key-edge); transition: box-shadow .06s, top .06s; margin-bottom: 5px; height: 34px;
   }
-  .key:hover { background: #f0f0f0; }
-  .key:active { top: 4px; box-shadow: 0 1px 0 #111; }
+  .key:hover { background: var(--key-hover); }
+  .key:active { top: 4px; box-shadow: 0 1px 0 var(--key-edge); }
   .key svg { width: 16px; height: 16px; }
-  .key.danger:hover { color: #c62828; background: #fdf1f1; }
-  .key:disabled, .key:disabled:hover { cursor: default; color: #a3a6ab; background: #fafafa; border-color: #c8cbcf; box-shadow: 0 4px 0 #d5d8dc, 0 5px 0 #c8cbcf; top: 0; }
+  .key.danger:hover { color: var(--danger); background: var(--danger-bg); }
+  .key:disabled, .key:disabled:hover { cursor: default; color: var(--dis-ink); background: var(--key-face); border-color: var(--dis-edge); box-shadow: 0 4px 0 var(--dis-base), 0 5px 0 var(--dis-edge); top: 0; }
+  .key.icon { padding: 8px 9px 10px; }
 
   /* ---- empty state ---- */
   .empty {
     max-width: 560px; margin: 14vh auto 0; padding: 56px 40px; text-align: center;
-    border: 1px dashed #b9bdc3; border-radius: 4px;
+    border: 1px dashed var(--dash); border-radius: 4px;
   }
   .empty .big { display: block; font-size: 22px; margin-bottom: 8px; }
   .empty .small { font-size: 14px; color: var(--ink-dim); display: block; margin-bottom: 20px; }
@@ -126,7 +166,10 @@
   .doc .frontmatter { font-family: var(--mono); font-size: 0.75em; color: var(--ink-dim); border-left: 3px solid var(--rule); padding: 0.2em 0 0.2em 1em; white-space: pre-wrap; }
 
   .hidden { display: none !important; }
-  ::selection { background: #e2e2e2; }
+  ::selection { background: var(--selection); }
+  .doc img { background: #fff; }
+  :root[data-theme="dark"] .theme-sun { display: inline; }
+  :root[data-theme="dark"] .theme-moon, .theme-sun { display: none; }
 
   @media (max-width: 720px) {
     .bar { padding: 12px 16px; gap: 10px; }
@@ -138,6 +181,12 @@
     .empty { margin: 8vh 16px 0; padding: 40px 20px; }
   }
 </style>
+<script>
+  // set theme before first paint to avoid a flash
+  (function () { var t = null; try { t = (JSON.parse(localStorage.getItem('markdown-reader.session.v1') || '{}') || {}).theme; } catch (e) {}
+    if (!t) t = window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    document.documentElement.setAttribute('data-theme', t); })();
+</script>
 </head>
 <body>
 <header class="bar" id="bar">
@@ -147,6 +196,10 @@
     <span id="filenameText"></span>
   </span></div>
   <div class="controls">
+    <button class="key icon" id="themeBtn" title="Switch to dark mode" aria-label="Toggle dark mode">
+      <svg class="theme-moon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
+      <svg class="theme-sun" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>
+    </button>
     <div class="seg" role="group" aria-label="Font">
       <button class="serif" data-font="serif" title="Serif">Serif</button>
       <button data-font="sans" title="Sans serif">Sans</button>
@@ -192,11 +245,21 @@
   var $ = function (id) { return document.getElementById(id); };
   var FONTS = { serif: 'var(--serif)', sans: 'var(--sans)', mono: 'var(--mono)' };
   var SIZES = [15, 16, 17, 18, 19, 20, 22, 24];
-  var state = { font: 'sans', size: 19, width: 68, text: '', name: '' };
+  var state = { theme: null, font: 'sans', size: 19, width: 68, text: '', name: '' };
 
   function save() { try { localStorage.setItem(LS_KEY, JSON.stringify(state)); } catch (e) {} }
   function load() {
     try { var d = JSON.parse(localStorage.getItem(LS_KEY) || 'null'); if (d) Object.keys(state).forEach(function (k) { if (d[k] != null) state[k] = d[k]; }); } catch (e) {}
+  }
+
+  function currentTheme() {
+    if (state.theme) return state.theme;
+    return window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  }
+  function applyTheme() {
+    var t = currentTheme();
+    document.documentElement.setAttribute('data-theme', t);
+    var b = $('themeBtn'); if (b) b.title = t === 'dark' ? 'Switch to light mode' : 'Switch to dark mode';
   }
 
   function applySettings() {
@@ -248,7 +311,11 @@
   }
 
   function init() {
-    load(); applySettings(); render();
+    load(); applyTheme(); applySettings(); render();
+    $('themeBtn').addEventListener('click', function () {
+      state.theme = currentTheme() === 'dark' ? 'light' : 'dark'; applyTheme(); save();
+    });
+    if (window.matchMedia) matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function () { if (!state.theme) applyTheme(); });
 
     document.querySelectorAll('[data-font]').forEach(function (b) {
       b.addEventListener('click', function () { state.font = b.dataset.font; applySettings(); save(); });
