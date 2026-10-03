@@ -73,6 +73,10 @@
   body.dragging .empty, body.dragging .preview { outline: 2px dashed var(--ink); outline-offset: 8px; }
 
   .preview { position: relative; max-width: 100%; max-height: 100%; display: flex; }
+  .zoom { display: flex; align-items: center; gap: 10px; }
+  .zoom input[type="range"] { width: 120px; accent-color: var(--ink); margin: 0 0 5px; }
+  .preview.pannable canvas { cursor: grab; touch-action: none; }
+  .preview.pannable.panning canvas { cursor: grabbing; }
   .preview canvas { display: block; max-width: 100%; max-height: calc(100vh - 140px); width: auto; height: auto; border-radius: 4px; }
   /* checkerboard shows through when the background is transparent */
   .preview.checker canvas {
@@ -113,6 +117,15 @@
       <div class="seg" role="group" aria-label="Window style">
         <button data-opt="macTheme" data-val="light">Light</button>
         <button data-opt="macTheme" data-val="dark">Dark</button>
+      </div>
+    </div>
+    <div class="group hidden" id="zoomGroup"><span class="glabel">Content</span>
+      <div class="zoom">
+        <div class="seg" role="group" aria-label="Content fit">
+          <button id="fitBtn" title="Show the whole image inside the screen">Fit</button>
+          <button id="fillBtn" title="Fill the screen, cropping the edges">Fill</button>
+        </div>
+        <input type="range" id="zoomRange" min="0" max="1000" value="0" aria-label="Zoom" title="Zoom — drag the preview to move" />
       </div>
     </div>
     <div class="group"><span class="glabel">Background</span>
@@ -192,6 +205,20 @@
     ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
   }
   // draw media into a box, cropped to cover it (anchored to the top for tall phone screens)
+  // How the content sits inside the iPhone screen. zoom: 1 = fill (cover); lower values zoom out
+  // down to "fit" (whole image visible). px/py: 0..1 position of the visible window (0 = left/top).
+  var place = { zoom: 1, px: 0.5, py: 0 };
+  var MAX_ZOOM = 3;
+  function fitZoom(sw, sh, w, h) { return Math.min(w / sw, h / sh) / Math.max(w / sw, h / sh); }
+  function placeRect(sw, sh, w, h) {
+    var s = Math.max(w / sw, h / sh) * place.zoom, dw = sw * s, dh = sh * s;
+    return { dx: (w - dw) * place.px, dy: (h - dh) * place.py, dw: dw, dh: dh };
+  }
+  function resetPlace() { place = { zoom: 1, px: 0.5, py: 0 }; }
+  // slider 0..1000 maps log-scale between fit and MAX_ZOOM
+  function zoomToSlider(z, zf) { return Math.round(Math.log(z / zf) / Math.log(MAX_ZOOM / zf) * 1000); }
+  function sliderToZoom(v, zf) { return zf * Math.pow(MAX_ZOOM / zf, v / 1000); }
+
   function drawCover(ctx, el, sw, sh, x, y, w, h, top) {
     var s = Math.max(w / sw, h / sh), dw = sw * s, dh = sh * s;
     ctx.drawImage(el, x + (w - dw) / 2, top ? y : y + (h - dh) / 2, dw, dh);
@@ -253,7 +280,8 @@
       var sx = x + L.bezel, sy = y + L.bezel;
       ctx.save(); rr(ctx, sx, sy, L.screenW, L.screenH, L.screenR); ctx.clip();
       ctx.fillStyle = '#000'; ctx.fillRect(sx, sy, L.screenW, L.screenH);
-      drawCover(ctx, media.el, media.w, media.h, sx, sy, L.screenW, L.screenH, true);
+      var pr = placeRect(media.w, media.h, L.screenW, L.screenH);
+      ctx.drawImage(media.el, sx + pr.dx, sy + pr.dy, pr.dw, pr.dh);
       ctx.restore();
       // Dynamic Island
       var iw = 124 * u, ih = 36 * u;
@@ -289,6 +317,16 @@
     $('bgNone').disabled = !!video;
     $('bgNone').title = video ? 'MP4 can’t be transparent' : 'Transparent background';
     $('macThemeGroup').classList.toggle('hidden', opts.frame !== 'mac');
+    var phone = opts.frame === 'iphone' && !!src;
+    $('zoomGroup').classList.toggle('hidden', !phone);
+    $('preview').classList.toggle('pannable', phone && !recording);
+    if (phone) {
+      var zf = fitZoom(src.w, src.h, src.w, Math.round(src.w * IPHONE_RATIO));
+      $('zoomRange').value = zoomToSlider(place.zoom, zf);
+      $('fitBtn').setAttribute('aria-pressed', Math.abs(place.zoom - zf) < 1e-3);
+      $('fillBtn').setAttribute('aria-pressed', Math.abs(place.zoom - 1) < 1e-3);
+      $('zoomRange').disabled = $('fitBtn').disabled = $('fillBtn').disabled = recording;
+    }
     $('preview').classList.toggle('checker', opts.bg === 'none');
     $('exportLabel').textContent = video ? 'Export MP4' : 'Export PNG';
     $('exportBtn').disabled = !src || recording;
@@ -299,6 +337,7 @@
   }
 
   function setSource(file) {
+    resetPlace();
     if (!file) return;
     var isVid = /^video\//.test(file.type), url = URL.createObjectURL(file);
     cancelAnimationFrame(raf);
@@ -411,6 +450,12 @@
     var media = src.kind === 'video'
       ? '<video src="' + name + '" autoplay muted loop playsinline></video>'
       : '<img src="' + name + '" alt="">';
+    if (opts.frame === 'iphone') {
+      var W = src.w, H = Math.round(src.w * IPHONE_RATIO), pr = placeRect(src.w, src.h, W, H);
+      var pct = function (n, d) { return +(n / d * 100).toFixed(3) + '%'; };
+      var st = ' style="left: ' + pct(pr.dx, W) + '; top: ' + pct(pr.dy, H) + '; width: ' + pct(pr.dw, W) + '; height: ' + pct(pr.dh, H) + ';"';
+      media = media.replace(/^<(video|img)/, '<$1' + st);
+    }
     var shadow = opts.shadow === 'on' ? '\n  filter: drop-shadow(0 4px 16px rgba(0, 0, 0, 0.06));' : '';
     if (opts.frame === 'mac') {
       var dark = opts.macTheme === 'dark';
@@ -432,7 +477,7 @@
       '.device-iphone .screen { position: relative; aspect-ratio: 1179 / 2556; border-radius: 11.51cqw; overflow: hidden; background: #000; }\n' +
       '.device-iphone .screen::after {\n  content: ""; position: absolute; top: 2.64cqw; left: 50%; transform: translateX(-50%);\n' +
       '  width: 29.74cqw; height: 8.63cqw; border-radius: 999px; background: #000;\n}\n' +
-      '.device-iphone img, .device-iphone video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: top; }\n</style>\n\n' +
+      '.device-iphone img, .device-iphone video { position: absolute; display: block; max-width: none; }\n</style>\n\n' +
       '<figure class="device-iphone" style="margin: 0;">\n  <div class="frame"><div class="screen">' + media + '</div></div>\n</figure>\n';
   }
   function copySnippet() {
@@ -447,6 +492,31 @@
 
   function init() {
     load(); syncUI();
+    function phoneDims() { return { W: src.w, H: Math.round(src.w * IPHONE_RATIO) }; }
+    $('zoomRange').addEventListener('input', function () {
+      var d = phoneDims(); place.zoom = sliderToZoom(+this.value, fitZoom(src.w, src.h, d.W, d.H)); syncUI();
+    });
+    $('fitBtn').addEventListener('click', function () { var d = phoneDims(); place = { zoom: fitZoom(src.w, src.h, d.W, d.H), px: 0.5, py: 0.5 }; syncUI(); });
+    $('fillBtn').addEventListener('click', function () { place = { zoom: 1, px: 0.5, py: 0 }; syncUI(); });
+    // drag the preview to move the content inside the screen
+    var drag = null, cv = $('canvas');
+    cv.addEventListener('pointerdown', function (e) {
+      if (!src || opts.frame !== 'iphone' || recording) return;
+      drag = { x: e.clientX, y: e.clientY, px: place.px, py: place.py };
+      cv.setPointerCapture(e.pointerId); $('preview').classList.add('panning');
+    });
+    cv.addEventListener('pointermove', function (e) {
+      if (!drag) return;
+      var L = layout(), k = cv.width / cv.clientWidth / outScale(L, src.kind === 'video' ? MAX_VID : MAX_IMG);
+      var pr = placeRect(src.w, src.h, L.screenW, L.screenH);
+      var ox = L.screenW - pr.dw, oy = L.screenH - pr.dh;           // overflow (negative when content is larger)
+      if (Math.abs(ox) > 0.5) place.px = Math.min(1, Math.max(0, drag.px + (e.clientX - drag.x) * k / ox));
+      if (Math.abs(oy) > 0.5) place.py = Math.min(1, Math.max(0, drag.py + (e.clientY - drag.y) * k / oy));
+      render();
+    });
+    var endDrag = function () { if (!drag) return; drag = null; $('preview').classList.remove('panning'); syncUI(); };
+    cv.addEventListener('pointerup', endDrag); cv.addEventListener('pointercancel', endDrag);
+
     document.querySelectorAll('[data-opt]').forEach(function (b) {
       b.addEventListener('click', function () { if (recording) return; opts[b.dataset.opt] = b.dataset.val; save(); syncUI(); });
     });
