@@ -6,7 +6,7 @@ A small collection of single-file HTML tools. Each tool is one `.html` file with
 
 | Tool | What it does |
 | --- | --- |
-| [Device Frames](https://kuynkank.github.io/html-utilities/device-frames.html) | Drop in a screenshot or screen recording and export it in a Mac window or iPhone frame, as PNG or MP4. |
+| [Device Frames](https://kuynkank.github.io/html-utilities/device-frames.html) | Drop in a screenshot or screen recording and export it in a desktop window or mobile phone frame, as PNG or MP4. |
 | [Markdown Reader](https://kuynkank.github.io/html-utilities/markdown-reader.html) | Paste or drop a Markdown file to read it rendered and wrapped, with adjustable font, size, and line width. |
 | [Screenshot Notes](https://kuynkank.github.io/html-utilities/screenshot-annotator.html) | Pin color-coded sticky notes on a screenshot and export the feedback as a ZIP, annotated PNG, or JSON. |
 

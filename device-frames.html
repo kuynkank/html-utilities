@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<meta name="description" content="Drop in a screenshot or screen recording and export it inside a clean Mac window or iPhone frame — PNG for images, MP4 for video." />
+<meta name="description" content="Drop in a screenshot or screen recording and export it inside a clean desktop window or mobile phone frame — PNG for images, MP4 for video." />
 <title>Device Frames</title>
 <style>
   :root {
@@ -31,12 +31,22 @@
   body { background: var(--bg); color: var(--ink); font-family: var(--ui); -webkit-font-smoothing: antialiased; display: flex; flex-direction: column; }
 
   /* ---- header ---- */
-  .bar { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; padding: 14px 20px; }
+  .bar { display: flex; align-items: center; gap: 12px 12px; flex-wrap: wrap; padding: 14px 20px 12px; border-bottom: 1px solid var(--rule); }
   .bar h1 { font-size: 20px; font-weight: 400; margin: 0 8px 0 0; white-space: nowrap; }
-  .controls { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
-  .group { display: flex; align-items: center; gap: 8px; }
+  .controls { display: flex; align-items: center; gap: 12px 16px; flex-wrap: wrap; order: 2; flex-basis: 100%; }
+  .group { display: flex; align-items: center; gap: 6px; }
   .glabel { font-size: 13px; color: var(--ink-dim); }
-  .actions { display: flex; align-items: center; gap: 12px; margin-left: auto; }
+  .group.off .glabel { opacity: .5; }
+  .sel {
+    appearance: none; -webkit-appearance: none; font-family: inherit; font-size: 14px; color: var(--ink);
+    height: 34px; padding: 0 30px 0 10px; border: 1px solid var(--rule); border-radius: 4px; cursor: pointer;
+    background: var(--bg) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%235a5e64' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") no-repeat right 10px center;
+  }
+  .sel:hover { border-color: #b9bdc3; }
+  .sel:focus-visible { outline: 2px solid var(--ink); outline-offset: 1px; }
+  .sel:disabled { cursor: default; color: var(--dis-ink); border-color: var(--rule); background-color: var(--soft); opacity: .8; }
+  .zoom input[type="range"]:disabled { opacity: .4; }
+  .actions { display: flex; align-items: center; gap: 10px; margin-left: auto; order: 1; }
 
   /* keycaps */
   .key, .seg button {
@@ -45,7 +55,7 @@
     border: 1px solid var(--key-edge); border-bottom: none; height: 34px;
     box-shadow: 0 4px 0 var(--key-base), 0 5px 0 var(--key-edge); transition: box-shadow .06s, top .06s;
   }
-  .key { display: inline-flex; align-items: center; gap: 7px; border-radius: 4px; padding: 8px 14px 10px; margin-bottom: 5px; }
+  .key { display: inline-flex; align-items: center; gap: 7px; white-space: nowrap; border-radius: 4px; padding: 8px 14px 10px; margin-bottom: 5px; }
   .key svg { width: 16px; height: 16px; }
   .key:hover, .seg button:hover { background: var(--key-hover); }
   .key:active, .seg button:active { top: 4px; box-shadow: 0 1px 0 var(--key-edge); }
@@ -54,6 +64,9 @@
     cursor: default; color: var(--dis-ink); background: var(--key-face); border-color: var(--dis-edge);
     box-shadow: 0 4px 0 var(--dis-base), 0 5px 0 var(--dis-edge); top: 0;
   }
+  .key.icon { padding: 8px 10px 10px; }
+  .badge { font-size: 11px; font-weight: 500; letter-spacing: 0.04em; line-height: 1; color: var(--ink-dim); background: var(--badge); border-radius: 3px; padding: 3px 5px; position: relative; top: 1px; font-variant-numeric: tabular-nums; }
+  .key:disabled .badge { color: inherit; background: var(--soft); }
   .key kbd { font-family: inherit; font-size: 11px; line-height: 1; color: var(--ink-dim); background: var(--badge); border-radius: 3px; padding: 3px 5px; position: relative; top: 1px; }
   .seg { display: inline-flex; margin-bottom: 5px; }
   .seg button { border-right-width: 0; border-radius: 0; padding: 8px 12px 10px; }
@@ -62,7 +75,7 @@
   .seg button[aria-pressed="true"], .seg button[aria-pressed="true"]:hover { background: var(--sel-bg); color: var(--sel-ink); }
 
   /* ---- stage ---- */
-  main { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; padding: 8px 24px 32px; }
+  main { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; padding: 24px 24px 32px; }
   .empty {
     max-width: 560px; width: 100%; padding: 56px 40px; text-align: center;
     border: 1px dashed #b9bdc3; border-radius: 4px;
@@ -73,11 +86,11 @@
   body.dragging .empty, body.dragging .preview { outline: 2px dashed var(--ink); outline-offset: 8px; }
 
   .preview { position: relative; max-width: 100%; max-height: 100%; display: flex; }
-  .zoom { display: flex; align-items: center; gap: 10px; }
-  .zoom input[type="range"] { width: 120px; accent-color: var(--ink); margin: 0 0 5px; }
+  .zoom { display: flex; align-items: center; gap: 8px; }
+  .zoom input[type="range"] { width: 120px; accent-color: var(--ink); margin: 0; }
   .preview.pannable canvas { cursor: grab; touch-action: none; }
   .preview.pannable.panning canvas { cursor: grabbing; }
-  .preview canvas { display: block; max-width: 100%; max-height: calc(100vh - 140px); width: auto; height: auto; border-radius: 4px; }
+  .preview canvas { display: block; max-width: 100%; max-height: calc(100vh - 220px); width: auto; height: auto; border-radius: 4px; }
   /* checkerboard shows through when the background is transparent */
   .preview.checker canvas {
     background-color: #fff;
@@ -107,53 +120,52 @@
 <header class="bar">
   <h1>Device Frames</h1>
   <div class="controls">
-    <div class="group"><span class="glabel">Frame</span>
-      <div class="seg" role="group" aria-label="Frame">
-        <button data-opt="frame" data-val="mac">Mac</button>
-        <button data-opt="frame" data-val="iphone">iPhone</button>
-      </div>
-    </div>
-    <div class="group" id="macThemeGroup"><span class="glabel">Window</span>
-      <div class="seg" role="group" aria-label="Window style">
-        <button data-opt="macTheme" data-val="light">Light</button>
-        <button data-opt="macTheme" data-val="dark">Dark</button>
-      </div>
-    </div>
-    <div class="group hidden" id="zoomGroup"><span class="glabel">Content</span>
+    <label class="group"><span class="glabel">Frame</span>
+      <select class="sel" data-opt="frame">
+        <option value="mac">Desktop</option>
+        <option value="iphone">Mobile</option>
+      </select>
+    </label>
+    <label class="group" id="windowGroup"><span class="glabel">Window</span>
+      <select class="sel" data-opt="macTheme" id="windowSel">
+        <option value="light">Light</option>
+        <option value="dark">Dark</option>
+      </select>
+    </label>
+    <div class="group" id="contentGroup"><label class="glabel" for="contentSel">Content</label>
       <div class="zoom">
-        <div class="seg" role="group" aria-label="Content fit">
-          <button id="fitBtn" title="Show the whole image inside the screen">Fit</button>
-          <button id="fillBtn" title="Fill the screen, cropping the edges">Fill</button>
-        </div>
+        <select class="sel" id="contentSel" title="How the image fills the phone screen — drag the preview to move it">
+          <option value="fill">Fill</option>
+          <option value="fit">Fit</option>
+          <option value="custom" disabled>Custom</option>
+        </select>
         <input type="range" id="zoomRange" min="0" max="1000" value="0" aria-label="Zoom" title="Zoom — drag the preview to move" />
       </div>
     </div>
-    <div class="group"><span class="glabel">Background</span>
-      <div class="seg" role="group" aria-label="Background">
-        <button data-opt="bg" data-val="none" id="bgNone">None</button>
-        <button data-opt="bg" data-val="light">Light</button>
-        <button data-opt="bg" data-val="dark">Dark</button>
-      </div>
-    </div>
-    <div class="group"><span class="glabel">Shadow</span>
-      <div class="seg" role="group" aria-label="Shadow">
-        <button data-opt="shadow" data-val="on">On</button>
-        <button data-opt="shadow" data-val="off">Off</button>
-      </div>
-    </div>
+    <label class="group"><span class="glabel">Background</span>
+      <select class="sel" data-opt="bg" id="bgSel">
+        <option value="none" id="bgNone">None</option>
+        <option value="light">Light</option>
+        <option value="dark">Dark</option>
+      </select>
+    </label>
+    <label class="group"><span class="glabel">Shadow</span>
+      <select class="sel" data-opt="shadow">
+        <option value="on">On</option>
+        <option value="off">Off</option>
+      </select>
+    </label>
   </div>
   <div class="actions">
-    <button class="key" id="openBtn" title="Open an image or video">
+    <button class="key icon" id="openBtn" title="Open an image or video" aria-label="Open an image or video">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>
-      Open <kbd class="sc" data-keys="O"></kbd>
     </button>
-    <button class="key" id="copyBtn" disabled title="Copy an HTML + CSS snippet that frames the original file on your own page">
+    <button class="key icon" id="copyBtn" aria-label="Copy HTML" disabled title="Copy HTML — a snippet that frames the original file on your own page">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m16 18 6-6-6-6"/><path d="m8 6-6 6 6 6"/></svg>
-      Copy HTML
     </button>
-    <button class="key" id="exportBtn" disabled>
+    <button class="key" id="exportBtn" disabled title="Export PNG" aria-label="Export PNG">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>
-      <span id="exportLabel">Export PNG</span>
+      <span class="badge" id="exportLabel">PNG</span>
     </button>
   </div>
 </header>
@@ -313,22 +325,26 @@
   function syncUI() {
     var video = src && src.kind === 'video';
     if (video && opts.bg === 'none') opts.bg = 'light';
-    document.querySelectorAll('[data-opt]').forEach(function (b) { b.setAttribute('aria-pressed', opts[b.dataset.opt] === b.dataset.val); });
+    document.querySelectorAll('select[data-opt]').forEach(function (el) { el.value = opts[el.dataset.opt]; el.disabled = recording; });
     $('bgNone').disabled = !!video;
-    $('bgNone').title = video ? 'MP4 can’t be transparent' : 'Transparent background';
-    $('macThemeGroup').classList.toggle('hidden', opts.frame !== 'mac');
-    var phone = opts.frame === 'iphone' && !!src;
-    $('zoomGroup').classList.toggle('hidden', !phone);
+    $('bgNone').textContent = video ? 'None (not for video)' : 'None';
+    var desktop = opts.frame === 'mac', phone = opts.frame === 'iphone' && !!src;
+    $('windowSel').disabled = !desktop || recording;
+    $('windowGroup').classList.toggle('off', !desktop);
+    $('windowGroup').title = desktop ? '' : 'Only for the desktop frame';
+    $('contentSel').disabled = $('zoomRange').disabled = !phone || recording;
+    $('contentGroup').classList.toggle('off', !phone);
+    $('contentGroup').title = phone ? '' : (opts.frame === 'iphone' ? 'Open a file to adjust' : 'Only for the mobile frame');
     $('preview').classList.toggle('pannable', phone && !recording);
     if (phone) {
       var zf = fitZoom(src.w, src.h, src.w, Math.round(src.w * IPHONE_RATIO));
       $('zoomRange').value = zoomToSlider(place.zoom, zf);
-      $('fitBtn').setAttribute('aria-pressed', Math.abs(place.zoom - zf) < 1e-3);
-      $('fillBtn').setAttribute('aria-pressed', Math.abs(place.zoom - 1) < 1e-3);
-      $('zoomRange').disabled = $('fitBtn').disabled = $('fillBtn').disabled = recording;
-    }
+      $('contentSel').value = Math.abs(place.zoom - 1) < 1e-3 && place.px === 0.5 && place.py === 0 ? 'fill'
+        : Math.abs(place.zoom - zf) < 1e-3 ? 'fit' : 'custom';
+    } else { $('contentSel').value = 'fill'; $('zoomRange').value = 0; }
     $('preview').classList.toggle('checker', opts.bg === 'none');
-    $('exportLabel').textContent = video ? 'Export MP4' : 'Export PNG';
+    if (!recording) $('exportLabel').textContent = video ? 'MP4' : 'PNG';
+    $('exportBtn').title = $('exportBtn').ariaLabel = video ? 'Export MP4' : 'Export PNG';
     $('exportBtn').disabled = !src || recording;
     $('copyBtn').disabled = !src || recording;
     $('empty').classList.toggle('hidden', !!src);
@@ -358,7 +374,7 @@
     } else toast('Drop an image or a video');
   }
 
-  function baseName() { return (src.name || 'asset').replace(/\.[^.]+$/, '') + '-' + opts.frame; }
+  function baseName() { return (src.name || 'asset').replace(/\.[^.]+$/, '') + '-' + (opts.frame === 'mac' ? 'desktop' : 'mobile'); }
   function download(blob, name) {
     var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name;
     document.body.appendChild(a); a.click(); a.remove(); setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
@@ -374,10 +390,10 @@
   // source frame rate. Falls back to recording the canvas in browsers without WebCodecs.
   var MB_URL = 'https://cdn.jsdelivr.net/npm/mediabunny@1.61.1/dist/bundles/mediabunny.min.mjs';
   function setProgress(t) { $('exportLabel').textContent = t; }
-  function finishExport(msg) { recording = false; setProgress('Export MP4'); syncUI(); if (msg) toast(msg); }
+  function finishExport(msg) { recording = false; setProgress('MP4'); syncUI(); if (msg) toast(msg); }
 
   async function exportVideo() {
-    recording = true; syncUI(); setProgress('Preparing…');
+    recording = true; syncUI(); setProgress('…');
     var MB = null;
     try { if (window.VideoEncoder) MB = await import(MB_URL); } catch (e) { MB = null; }
     if (!MB) return exportVideoRecorder();
@@ -409,7 +425,7 @@
         frame.close();
         await source.add(sample.timestamp - t0, sample.duration || 1 / fps);
         sample.close();
-        if (++n % 10 === 0) setProgress('Encoding ' + Math.min(100, Math.round((sample.timestamp - t0) / duration * 100)) + '%');
+        if (++n % 10 === 0) setProgress('' + Math.min(100, Math.round((sample.timestamp - t0) / duration * 100)) + '%');
       }
       await output.finalize();
       download(new Blob([target.buffer], { type: 'video/mp4' }), baseName() + '.mp4');
@@ -439,7 +455,7 @@
       rec.start(250); v.play();
       v.addEventListener('ended', function () { rec.stop(); }, { once: true });
     }, { once: true });
-    var tick = setInterval(function () { setProgress('Recording ' + Math.floor(v.currentTime) + 's / ' + Math.round(v.duration) + 's'); }, 250);
+    var tick = setInterval(function () { setProgress(Math.floor(v.currentTime) + 's / ' + Math.round(v.duration) + 's'); }, 250);
   }
 
   // ---- HTML snippet: frame the original file with CSS on your own page (no re-encoding) ----
@@ -460,25 +476,25 @@
     if (opts.frame === 'mac') {
       var dark = opts.macTheme === 'dark';
       return '<style>\n' +
-        '.device-mac {\n  display: inline-block; max-width: 100%; border-radius: 10px; overflow: hidden;\n' +
+        '.device-desktop {\n  display: inline-block; max-width: 100%; border-radius: 10px; overflow: hidden;\n' +
         '  border: 1px solid ' + (dark ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.14)') + '; background: ' + (dark ? '#2c2c2e' : '#ebebeb') + ';' + shadow + '\n}\n' +
-        '.device-mac .bar {\n  height: 28px; display: flex; align-items: center; gap: 8px; padding: 0 14px;\n' +
+        '.device-desktop .bar {\n  height: 28px; display: flex; align-items: center; gap: 8px; padding: 0 14px;\n' +
         '  border-bottom: 1px solid ' + (dark ? 'rgba(0, 0, 0, 0.45)' : 'rgba(0, 0, 0, 0.10)') + ';\n}\n' +
-        '.device-mac .bar i { width: 12px; height: 12px; border-radius: 50%; box-shadow: inset 0 0 0 0.5px rgba(0, 0, 0, 0.12); }\n' +
-        '.device-mac .bar i:nth-child(1) { background: #ff5f57; }\n.device-mac .bar i:nth-child(2) { background: #febc2e; }\n.device-mac .bar i:nth-child(3) { background: #28c840; }\n' +
-        '.device-mac img, .device-mac video { display: block; width: 100%; height: auto; }\n</style>\n\n' +
-        '<figure class="device-mac" style="margin: 0;">\n  <div class="bar"><i></i><i></i><i></i></div>\n  ' + media + '\n</figure>\n';
+        '.device-desktop .bar i { width: 12px; height: 12px; border-radius: 50%; box-shadow: inset 0 0 0 0.5px rgba(0, 0, 0, 0.12); }\n' +
+        '.device-desktop .bar i:nth-child(1) { background: #ff5f57; }\n.device-desktop .bar i:nth-child(2) { background: #febc2e; }\n.device-desktop .bar i:nth-child(3) { background: #28c840; }\n' +
+        '.device-desktop img, .device-desktop video { display: block; width: 100%; height: auto; }\n</style>\n\n' +
+        '<figure class="device-desktop" style="margin: 0;">\n  <div class="bar"><i></i><i></i><i></i></div>\n  ' + media + '\n</figure>\n';
     }
     // iPhone: sized by the frame width; everything else scales with it (container query units)
     return '<style>\n' +
-      '.device-iphone { --w: 320px; width: var(--w); max-width: 100%; container-type: inline-size; }\n' +
-      '.device-iphone .frame {\n  box-sizing: border-box; padding: 2.878cqw; border-radius: 14.39cqw; background: #0b0b0c;\n' +
+      '.device-mobile { --w: 320px; width: var(--w); max-width: 100%; container-type: inline-size; }\n' +
+      '.device-mobile .frame {\n  box-sizing: border-box; padding: 2.878cqw; border-radius: 14.39cqw; background: #0b0b0c;\n' +
       '  box-shadow: inset 0 0 0 0.36cqw #3a3a3d;' + shadow + '\n}\n' +
-      '.device-iphone .screen { position: relative; aspect-ratio: 1179 / 2556; border-radius: 11.51cqw; overflow: hidden; background: #000; }\n' +
-      '.device-iphone .screen::after {\n  content: ""; position: absolute; top: 2.64cqw; left: 50%; transform: translateX(-50%);\n' +
+      '.device-mobile .screen { position: relative; aspect-ratio: 1179 / 2556; border-radius: 11.51cqw; overflow: hidden; background: #000; }\n' +
+      '.device-mobile .screen::after {\n  content: ""; position: absolute; top: 2.64cqw; left: 50%; transform: translateX(-50%);\n' +
       '  width: 29.74cqw; height: 8.63cqw; border-radius: 999px; background: #000;\n}\n' +
-      '.device-iphone img, .device-iphone video { position: absolute; display: block; max-width: none; }\n</style>\n\n' +
-      '<figure class="device-iphone" style="margin: 0;">\n  <div class="frame"><div class="screen">' + media + '</div></div>\n</figure>\n';
+      '.device-mobile img, .device-mobile video { position: absolute; display: block; max-width: none; }\n</style>\n\n' +
+      '<figure class="device-mobile" style="margin: 0;">\n  <div class="frame"><div class="screen">' + media + '</div></div>\n</figure>\n';
   }
   function copySnippet() {
     var text = snippet();
@@ -496,8 +512,12 @@
     $('zoomRange').addEventListener('input', function () {
       var d = phoneDims(); place.zoom = sliderToZoom(+this.value, fitZoom(src.w, src.h, d.W, d.H)); syncUI();
     });
-    $('fitBtn').addEventListener('click', function () { var d = phoneDims(); place = { zoom: fitZoom(src.w, src.h, d.W, d.H), px: 0.5, py: 0.5 }; syncUI(); });
-    $('fillBtn').addEventListener('click', function () { place = { zoom: 1, px: 0.5, py: 0 }; syncUI(); });
+    $('contentSel').addEventListener('change', function () {
+      var d = phoneDims();
+      if (this.value === 'fit') place = { zoom: fitZoom(src.w, src.h, d.W, d.H), px: 0.5, py: 0.5 };
+      else if (this.value === 'fill') place = { zoom: 1, px: 0.5, py: 0 };
+      syncUI();
+    });
     // drag the preview to move the content inside the screen
     var drag = null, cv = $('canvas');
     cv.addEventListener('pointerdown', function (e) {
@@ -517,8 +537,8 @@
     var endDrag = function () { if (!drag) return; drag = null; $('preview').classList.remove('panning'); syncUI(); };
     cv.addEventListener('pointerup', endDrag); cv.addEventListener('pointercancel', endDrag);
 
-    document.querySelectorAll('[data-opt]').forEach(function (b) {
-      b.addEventListener('click', function () { if (recording) return; opts[b.dataset.opt] = b.dataset.val; save(); syncUI(); });
+    document.querySelectorAll('select[data-opt]').forEach(function (el) {
+      el.addEventListener('change', function () { if (recording) return; opts[el.dataset.opt] = el.value; save(); syncUI(); });
     });
     [$('openBtn'), $('openBtn2')].forEach(function (b) { b.addEventListener('click', function () { $('fileInput').click(); }); });
     $('fileInput').addEventListener('change', function (e) { setSource(e.target.files[0]); e.target.value = ''; });
