@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="description" content="Drop in a screenshot or screen recording and export it inside a clean desktop window or mobile phone frame — PNG for images, MP4 for video." />
+<title>Device Frames</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%231a1a1a' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 8V5a2 2 0 0 1 2-2h3'/%3E%3Cpath d='M16 3h3a2 2 0 0 1 2 2v3'/%3E%3Cpath d='M21 16v3a2 2 0 0 1-2 2h-3'/%3E%3Cpath d='M8 21H5a2 2 0 0 1-2-2v-3'/%3E%3C/svg%3E" />
+<style>
+  :root {
+    --bg: #fefefe;
+    --ink: #111317;
+    --ink-dim: #5a5e64;
+    --rule: #dadce0;
+    --soft: #f3f4f5;
+    --badge: #eeeff1;
+    --key-face: #fafafa;
+    --key-hover: #f0f0f0;
+    --key-ink: #1a1a1a;
+    --key-edge: #111;
+    --key-base: #333;
+    --sel-bg: #1a1a1a;
+    --sel-ink: #fff;
+    --dis-ink: #a3a6ab;
+    --dis-edge: #c8cbcf;
+    --dis-base: #d5d8dc;
+    --ui: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  button, input { font-family: inherit; }
+  html, body { margin: 0; height: 100%; }
+  body { background: var(--bg); color: var(--ink); font-family: var(--ui); -webkit-font-smoothing: antialiased; display: flex; flex-direction: column; }
+
+  /* ---- header ---- */
+  .bar { display: flex; align-items: center; gap: 12px 12px; flex-wrap: wrap; padding: 14px 20px 12px; border-bottom: 1px solid var(--rule); }
+  .bar h1 { font-size: 20px; font-weight: 400; margin: 0 8px 0 0; white-space: nowrap; }
+  .controls { display: flex; align-items: center; gap: 12px 16px; flex-wrap: wrap; order: 2; flex-basis: 100%; }
+  .group { display: flex; align-items: center; gap: 6px; }
+  .glabel { font-size: 13px; color: var(--ink-dim); }
+  .group.off .glabel { opacity: .5; }
+  .sel {
+    appearance: none; -webkit-appearance: none; font-family: inherit; font-size: 14px; color: var(--ink);
+    height: 34px; padding: 0 30px 0 10px; border: 1px solid var(--rule); border-radius: 4px; cursor: pointer;
+    background: var(--bg) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%235a5e64' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") no-repeat right 10px center;
+  }
+  .sel:hover { border-color: #b9bdc3; }
+  .sel:focus-visible { outline: 2px solid var(--ink); outline-offset: 1px; }
+  .sel:disabled { cursor: default; color: var(--dis-ink); border-color: var(--rule); background-color: var(--soft); opacity: .8; }
+  .zoom input[type="range"]:disabled { opacity: .4; }
+  .actions { display: flex; align-items: center; gap: 10px; margin-left: auto; order: 1; }
+
+  /* keycaps */
+  .key, .seg button {
+    position: relative; top: 0; cursor: pointer; line-height: 1; font-size: 14px;
+    color: var(--key-ink); background: var(--key-face);
+    border: 1px solid var(--key-edge); border-bottom: none; height: 34px;
+    box-shadow: 0 4px 0 var(--key-base), 0 5px 0 var(--key-edge); transition: box-shadow .06s, top .06s;
+  }
+  .key { display: inline-flex; align-items: center; gap: 7px; white-space: nowrap; border-radius: 4px; padding: 8px 14px 10px; margin-bottom: 5px; }
+  .key svg { width: 16px; height: 16px; }
+  .key:hover, .seg button:hover { background: var(--key-hover); }
+  .key:active, .seg button:active { top: 4px; box-shadow: 0 1px 0 var(--key-edge); }
+  .key:focus-visible, .seg button:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+  .key:disabled, .key:disabled:hover, .seg button:disabled, .seg button:disabled:hover {
+    cursor: default; color: var(--dis-ink); background: var(--key-face); border-color: var(--dis-edge);
+    box-shadow: 0 4px 0 var(--dis-base), 0 5px 0 var(--dis-edge); top: 0;
+  }
+  .key.icon { padding: 8px 10px 10px; }
+  .badge { font-size: 11px; font-weight: 500; letter-spacing: 0.04em; line-height: 1; color: var(--ink-dim); background: var(--badge); border-radius: 3px; padding: 3px 5px; position: relative; top: 1px; font-variant-numeric: tabular-nums; }
+  .key:disabled .badge { color: inherit; background: var(--soft); }
+  .key kbd { font-family: inherit; font-size: 11px; line-height: 1; color: var(--ink-dim); background: var(--badge); border-radius: 3px; padding: 3px 5px; position: relative; top: 1px; }
+  .seg { display: inline-flex; margin-bottom: 5px; }
+  .seg button { border-right-width: 0; border-radius: 0; padding: 8px 12px 10px; }
+  .seg button:first-child { border-radius: 4px 0 0 4px; }
+  .seg button:last-child { border-radius: 0 4px 4px 0; border-right-width: 1px; }
+  .seg button[aria-pressed="true"], .seg button[aria-pressed="true"]:hover { background: var(--sel-bg); color: var(--sel-ink); }
+
+  /* ---- stage ---- */
+  main { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; padding: 24px 24px 32px; }
+  .empty {
+    max-width: 560px; width: 100%; padding: 56px 40px; text-align: center;
+    border: 1px dashed #b9bdc3; border-radius: 4px;
+  }
+  .empty .big { display: block; font-size: 22px; margin-bottom: 8px; }
+  .empty .small { display: block; font-size: 14px; color: var(--ink-dim); margin-bottom: 20px; }
+  .empty kbd { border: 1px solid var(--rule); border-radius: 4px; padding: 1px 6px; font-size: 12px; background: var(--soft); font-family: var(--ui); }
+  body.dragging .empty, body.dragging .preview { outline: 2px dashed var(--ink); outline-offset: 8px; }
+
+  .preview { position: relative; max-width: 100%; max-height: 100%; display: flex; }
+  .zoom { display: flex; align-items: center; gap: 8px; }
+  .zoom input[type="range"] { width: 120px; accent-color: var(--ink); margin: 0; }
+  .preview.pannable canvas { cursor: grab; touch-action: none; }
+  .preview.pannable.panning canvas { cursor: grabbing; }
+  .preview canvas { display: block; max-width: 100%; max-height: calc(100vh - 220px); width: auto; height: auto; border-radius: 4px; }
+  /* checkerboard shows through when the background is transparent */
+  .preview.checker canvas {
+    background-color: #fff;
+    background-image: linear-gradient(45deg, #eceef0 25%, transparent 25%), linear-gradient(-45deg, #eceef0 25%, transparent 25%),
+      linear-gradient(45deg, transparent 75%, #eceef0 75%), linear-gradient(-45deg, transparent 75%, #eceef0 75%);
+    background-size: 16px 16px; background-position: 0 0, 0 8px, 8px -8px, -8px 0;
+  }
+  .meta { position: absolute; left: 0; bottom: -24px; font-size: 12px; color: var(--ink-dim); white-space: nowrap; }
+
+  .toast {
+    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(16px);
+    background: #1a1a1a; color: #fff; padding: 12px 16px; border-radius: 4px; font-size: 14px;
+    opacity: 0; pointer-events: none; transition: all .2s ease-out; z-index: 50;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  .hidden { display: none !important; }
+
+  @media (max-width: 720px) {
+    .bar { padding: 12px 16px; gap: 10px; }
+    .actions { margin-left: 0; }
+    .key kbd { display: none; }
+    main { padding: 8px 16px 32px; }
+  }
+</style>
+</head>
+<body>
+<header class="bar">
+  <h1>Device Frames</h1>
+  <div class="controls">
+    <label class="group"><span class="glabel">Frame</span>
+      <select class="sel" data-opt="frame">
+        <option value="mac">Desktop</option>
+        <option value="iphone">Mobile</option>
+      </select>
+    </label>
+    <label class="group" id="windowGroup"><span class="glabel">Window</span>
+      <select class="sel" data-opt="macTheme" id="windowSel">
+        <option value="light">Light</option>
+        <option value="dark">Dark</option>
+      </select>
+    </label>
+    <div class="group" id="contentGroup"><label class="glabel" for="contentSel">Content</label>
+      <div class="zoom">
+        <select class="sel" id="contentSel" title="How the image fills the phone screen — drag the preview to move it">
+          <option value="fill">Fill</option>
+          <option value="fit">Fit</option>
+          <option value="custom" disabled>Custom</option>
+        </select>
+        <input type="range" id="zoomRange" min="0" max="1000" value="0" aria-label="Zoom" title="Zoom — drag the preview to move" />
+      </div>
+    </div>
+    <label class="group"><span class="glabel">Background</span>
+      <select class="sel" data-opt="bg" id="bgSel">
+        <option value="none" id="bgNone">None</option>
+        <option value="light">Light</option>
+        <option value="dark">Dark</option>
+      </select>
+    </label>
+    <label class="group"><span class="glabel">Shadow</span>
+      <select class="sel" data-opt="shadow">
+        <option value="on">On</option>
+        <option value="off">Off</option>
+      </select>
+    </label>
+  </div>
+  <div class="actions">
+    <button class="key icon" id="openBtn" title="Open an image or video" aria-label="Open an image or video">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>
+    </button>
+    <button class="key icon" id="copyBtn" aria-label="Copy HTML" disabled title="Copy HTML — a snippet that frames the original file on your own page">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m16 18 6-6-6-6"/><path d="m8 6-6 6 6 6"/></svg>
+    </button>
+    <button class="key" id="exportBtn" disabled title="Export PNG" aria-label="Export PNG">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>
+      <span class="badge" id="exportLabel">PNG</span>
+    </button>
+  </div>
+</header>
+
+<main>
+  <div class="empty" id="empty">
+    <span class="big">Add an image or video</span>
+    <span class="small">drag &amp; drop, open, or paste <kbd>Ctrl/Cmd</kbd>+<kbd>V</kbd></span>
+    <button class="key" id="openBtn2">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>
+      Open file <kbd class="sc" data-keys="O"></kbd>
+    </button>
+  </div>
+  <div class="preview hidden" id="preview">
+    <canvas id="canvas"></canvas>
+    <span class="meta" id="meta"></span>
+  </div>
+</main>
+<input type="file" id="fileInput" accept="image/*,video/*" class="hidden" />
+<div class="toast" id="toast"></div>
+
+<script>
+(function () {
+  'use strict';
+  var LS_KEY = 'device-frames.settings.v1', OLD_LS_KEY = 'asset-template.settings.v1';
+  var $ = function (id) { return document.getElementById(id); };
+  var opts = { frame: 'mac', macTheme: 'light', bg: 'none', shadow: 'on' };
+  var src = null;        // { kind: 'image'|'video', el, w, h, name }
+  var recording = false;
+
+  // Mac window palettes; traffic-light colors are the real macOS ones
+  var MAC = {
+    light: { bar: '#ebebeb', barEdge: 'rgba(0,0,0,0.10)', frame: 'rgba(0,0,0,0.14)' },
+    dark:  { bar: '#2c2c2e', barEdge: 'rgba(0,0,0,0.45)', frame: 'rgba(255,255,255,0.12)' }
+  };
+  var DOTS = ['#ff5f57', '#febc2e', '#28c840'];
+  var BG = { light: '#f5f5f7', dark: '#141416' };
+  var IPHONE_RATIO = 2556 / 1179;           // iPhone 15/16 Pro screen
+  var MAX_IMG = 4000, MAX_VID = 3840;        // longest output edge
+
+  function save() { try { localStorage.setItem(LS_KEY, JSON.stringify(opts)); } catch (e) {} }
+  function load() { try { var d = JSON.parse(localStorage.getItem(LS_KEY) || localStorage.getItem(OLD_LS_KEY) || 'null'); if (d) Object.keys(opts).forEach(function (k) { if (d[k]) opts[k] = d[k]; }); } catch (e) {} }
+  function toast(msg) { var t = $('toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toast._t); toast._t = setTimeout(function () { t.classList.remove('show'); }, 2600); }
+
+  function rr(ctx, x, y, w, h, r) {
+    r = Math.min(r, w / 2, h / 2);
+    ctx.beginPath(); ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
+  }
+  // draw media into a box, cropped to cover it (anchored to the top for tall phone screens)
+  // How the content sits inside the iPhone screen. zoom: 1 = fill (cover); lower values zoom out
+  // down to "fit" (whole image visible). px/py: 0..1 position of the visible window (0 = left/top).
+  var place = { zoom: 1, px: 0.5, py: 0 };
+  var MAX_ZOOM = 3;
+  function fitZoom(sw, sh, w, h) { return Math.min(w / sw, h / sh) / Math.max(w / sw, h / sh); }
+  function placeRect(sw, sh, w, h) {
+    var s = Math.max(w / sw, h / sh) * place.zoom, dw = sw * s, dh = sh * s;
+    return { dx: (w - dw) * place.px, dy: (h - dh) * place.py, dw: dw, dh: dh };
+  }
+  function resetPlace() { place = { zoom: 1, px: 0.5, py: 0 }; }
+  // slider 0..1000 maps log-scale between fit and MAX_ZOOM
+  function zoomToSlider(z, zf) { return Math.round(Math.log(z / zf) / Math.log(MAX_ZOOM / zf) * 1000); }
+  function sliderToZoom(v, zf) { return zf * Math.pow(MAX_ZOOM / zf, v / 1000); }
+
+  function drawCover(ctx, el, sw, sh, x, y, w, h, top) {
+    var s = Math.max(w / sw, h / sh), dw = sw * s, dh = sh * s;
+    ctx.drawImage(el, x + (w - dw) / 2, top ? y : y + (h - dh) / 2, dw, dh);
+  }
+
+  // Layout everything in "frame units" so the frame scales with the content.
+  function layout() {
+    var w = src.w, h = src.h, L = {};
+    if (opts.frame === 'mac') {
+      var u = w / 1440;                    // 1 unit ≈ 1pt on a 1440pt-wide screen
+      L.u = u; L.screenW = w; L.screenH = h; L.bar = 28 * u; L.radius = 10 * u;
+      L.frameW = w; L.frameH = h + L.bar;
+    } else {
+      var sw = w, sh = Math.round(w * IPHONE_RATIO), u2 = sw / 393; // 393pt-wide phone
+      L.u = u2; L.screenW = sw; L.screenH = sh; L.bezel = 12 * u2; L.screenR = 48 * u2;
+      L.frameW = sw + 2 * L.bezel; L.frameH = sh + 2 * L.bezel; L.radius = L.screenR + L.bezel;
+    }
+    var hasPad = opts.shadow === 'on' || opts.bg !== 'none';
+    L.pad = hasPad ? Math.round(Math.max(L.frameW, L.frameH) * 0.06) : 0;
+    L.W = L.frameW + 2 * L.pad; L.H = L.frameH + 2 * L.pad;
+    return L;
+  }
+
+  function draw(ctx, L, k, media) {
+    media = media || src;
+    // k = output scale (to cap very large outputs)
+    ctx.save(); ctx.scale(k, k);
+    ctx.clearRect(0, 0, L.W, L.H);
+    if (opts.bg !== 'none') { ctx.fillStyle = BG[opts.bg]; ctx.fillRect(0, 0, L.W, L.H); }
+    var x = L.pad, y = L.pad, u = L.u;
+
+    // shadow: CSS drop-shadow(0 4px 16px rgba(0,0,0,.06)), scaled with the frame
+    if (opts.shadow === 'on') {
+      ctx.save();
+      ctx.shadowColor = 'rgba(0,0,0,0.06)'; ctx.shadowBlur = 16 * u * k; ctx.shadowOffsetY = 4 * u * k;
+      rr(ctx, x, y, L.frameW, L.frameH, L.radius); ctx.fillStyle = opts.frame === 'iphone' ? '#0b0b0c' : MAC[opts.macTheme].bar; ctx.fill();
+      ctx.restore();
+    }
+
+    if (opts.frame === 'mac') {
+      var P = MAC[opts.macTheme];
+      ctx.save(); rr(ctx, x, y, L.frameW, L.frameH, L.radius); ctx.clip();
+      ctx.fillStyle = P.bar; ctx.fillRect(x, y, L.frameW, L.bar);
+      drawCover(ctx, media.el, media.w, media.h, x, y + L.bar, L.screenW, L.screenH, false);
+      ctx.fillStyle = P.barEdge; ctx.fillRect(x, y + L.bar - Math.max(1, u), L.frameW, Math.max(1, u));
+      ctx.restore();
+      DOTS.forEach(function (c, i) {
+        ctx.beginPath(); ctx.arc(x + (20 + i * 20) * u, y + L.bar / 2, 6 * u, 0, Math.PI * 2);
+        ctx.fillStyle = c; ctx.fill();
+        ctx.lineWidth = Math.max(0.5, 0.5 * u); ctx.strokeStyle = 'rgba(0,0,0,0.12)'; ctx.stroke();
+      });
+      rr(ctx, x + 0.5 * u, y + 0.5 * u, L.frameW - u, L.frameH - u, L.radius - 0.5 * u);
+      ctx.lineWidth = Math.max(1, u); ctx.strokeStyle = P.frame; ctx.stroke();
+    } else {
+      rr(ctx, x, y, L.frameW, L.frameH, L.radius); ctx.fillStyle = '#0b0b0c'; ctx.fill();
+      // thin metallic edge
+      rr(ctx, x + 0.75 * u, y + 0.75 * u, L.frameW - 1.5 * u, L.frameH - 1.5 * u, L.radius - 0.75 * u);
+      ctx.lineWidth = 1.5 * u; ctx.strokeStyle = '#3a3a3d'; ctx.stroke();
+      var sx = x + L.bezel, sy = y + L.bezel;
+      ctx.save(); rr(ctx, sx, sy, L.screenW, L.screenH, L.screenR); ctx.clip();
+      ctx.fillStyle = '#000'; ctx.fillRect(sx, sy, L.screenW, L.screenH);
+      var pr = placeRect(media.w, media.h, L.screenW, L.screenH);
+      ctx.drawImage(media.el, sx + pr.dx, sy + pr.dy, pr.dw, pr.dh);
+      ctx.restore();
+      // Dynamic Island
+      var iw = 124 * u, ih = 36 * u;
+      rr(ctx, sx + (L.screenW - iw) / 2, sy + 11 * u, iw, ih, ih / 2); ctx.fillStyle = '#000'; ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  function outScale(L, max) { return Math.min(1, max / Math.max(L.W, L.H)); }
+  function even(n) { n = Math.round(n); return n % 2 ? n + 1 : n; }
+
+  function sizeCanvas(cv, L, k, video) {
+    var w = Math.round(L.W * k), h = Math.round(L.H * k);
+    if (video) { w = even(w); h = even(h); }
+    if (cv.width !== w) cv.width = w; if (cv.height !== h) cv.height = h;
+  }
+
+  var raf = 0;
+  function render() {
+    if (!src) return;
+    var L = layout(), video = src.kind === 'video';
+    var k = outScale(L, video ? MAX_VID : MAX_IMG), cv = $('canvas');
+    sizeCanvas(cv, L, k, video);
+    draw(cv.getContext('2d'), L, k);
+    $('meta').textContent = src.name + ' · ' + cv.width + '×' + cv.height + (video ? ' · ' + src.el.duration.toFixed(1) + 's' : '');
+  }
+  function loop() { render(); raf = requestAnimationFrame(loop); }
+
+  function syncUI() {
+    var video = src && src.kind === 'video';
+    if (video && opts.bg === 'none') opts.bg = 'light';
+    document.querySelectorAll('select[data-opt]').forEach(function (el) { el.value = opts[el.dataset.opt]; el.disabled = recording; });
+    $('bgNone').disabled = !!video;
+    $('bgNone').textContent = video ? 'None (not for video)' : 'None';
+    var desktop = opts.frame === 'mac', phone = opts.frame === 'iphone' && !!src;
+    $('windowSel').disabled = !desktop || recording;
+    $('windowGroup').classList.toggle('off', !desktop);
+    $('windowGroup').title = desktop ? '' : 'Only for the desktop frame';
+    $('contentSel').disabled = $('zoomRange').disabled = !phone || recording;
+    $('contentGroup').classList.toggle('off', !phone);
+    $('contentGroup').title = phone ? '' : (opts.frame === 'iphone' ? 'Open a file to adjust' : 'Only for the mobile frame');
+    $('preview').classList.toggle('pannable', phone && !recording);
+    if (phone) {
+      var zf = fitZoom(src.w, src.h, src.w, Math.round(src.w * IPHONE_RATIO));
+      $('zoomRange').value = zoomToSlider(place.zoom, zf);
+      $('contentSel').value = Math.abs(place.zoom - 1) < 1e-3 && place.px === 0.5 && place.py === 0 ? 'fill'
+        : Math.abs(place.zoom - zf) < 1e-3 ? 'fit' : 'custom';
+    } else { $('contentSel').value = 'fill'; $('zoomRange').value = 0; }
+    $('preview').classList.toggle('checker', opts.bg === 'none');
+    if (!recording) $('exportLabel').textContent = video ? 'MP4' : 'PNG';
+    $('exportBtn').title = $('exportBtn').ariaLabel = video ? 'Export MP4' : 'Export PNG';
+    $('exportBtn').disabled = !src || recording;
+    $('copyBtn').disabled = !src || recording;
+    $('empty').classList.toggle('hidden', !!src);
+    $('preview').classList.toggle('hidden', !src);
+    render();
+  }
+
+  function setSource(file) {
+    resetPlace();
+    if (!file) return;
+    var isVid = /^video\//.test(file.type), url = URL.createObjectURL(file);
+    cancelAnimationFrame(raf);
+    if (src && src.url) URL.revokeObjectURL(src.url);
+    if (isVid) {
+      var v = document.createElement('video');
+      v.muted = true; v.loop = true; v.playsInline = true; v.src = url;
+      v.addEventListener('loadedmetadata', function () {
+        src = { kind: 'video', el: v, w: v.videoWidth, h: v.videoHeight, name: file.name, url: url, file: file };
+        v.play().catch(function () {}); syncUI(); loop();
+      }, { once: true });
+      v.addEventListener('error', function () { toast('Couldn’t read that video'); }, { once: true });
+    } else if (/^image\//.test(file.type)) {
+      var img = new Image();
+      img.onload = function () { src = { kind: 'image', el: img, w: img.naturalWidth, h: img.naturalHeight, name: file.name || 'Pasted image', url: url }; syncUI(); };
+      img.onerror = function () { toast('Couldn’t read that image'); };
+      img.src = url;
+    } else toast('Drop an image or a video');
+  }
+
+  function baseName() { return (src.name || 'asset').replace(/\.[^.]+$/, '') + '-' + (opts.frame === 'mac' ? 'desktop' : 'mobile'); }
+  function download(blob, name) {
+    var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name;
+    document.body.appendChild(a); a.click(); a.remove(); setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
+  }
+
+  function exportPng() {
+    $('canvas').toBlob(function (b) { download(b, baseName() + '.png'); toast('PNG saved'); }, 'image/png');
+  }
+
+  // ---- Video export ----
+  // Decodes the original file frame by frame, draws each frame into the device frame and encodes
+  // H.264 MP4 with proper color tags (WebCodecs via mediabunny). Faster than real time, keeps the
+  // source frame rate. Falls back to recording the canvas in browsers without WebCodecs.
+  var MB_URL = 'https://cdn.jsdelivr.net/npm/mediabunny@1.61.1/dist/bundles/mediabunny.min.mjs';
+  function setProgress(t) { $('exportLabel').textContent = t; }
+  function finishExport(msg) { recording = false; setProgress('MP4'); syncUI(); if (msg) toast(msg); }
+
+  async function exportVideo() {
+    recording = true; syncUI(); setProgress('…');
+    var MB = null;
+    try { if (window.VideoEncoder) MB = await import(MB_URL); } catch (e) { MB = null; }
+    if (!MB) return exportVideoRecorder();
+    try {
+      var input = new MB.Input({ source: new MB.BlobSource(src.file), formats: MB.ALL_FORMATS });
+      var track = await input.getPrimaryVideoTrack();
+      if (!track || !(await track.canDecode())) { input.dispose && input.dispose(); return exportVideoRecorder(); }
+      var duration = await track.computeDuration();
+      var stats = await track.computePacketStats(120);
+      var fps = Math.min(120, Math.max(1, Math.round(stats.averagePacketRate || 30)));
+
+      var L = layout(), k = outScale(L, MAX_VID);
+      var cv = document.createElement('canvas');
+      sizeCanvas(cv, L, k, true);
+      var ctx = cv.getContext('2d');
+      if (!(await MB.canEncodeVideo('avc', { width: cv.width, height: cv.height }))) throw new Error('H.264 encoding not supported at ' + cv.width + '×' + cv.height);
+
+      var target = new MB.BufferTarget();
+      var output = new MB.Output({ format: new MB.Mp4OutputFormat({ fastStart: 'in-memory' }), target: target });
+      var source = new MB.CanvasSource(cv, { codec: 'avc', bitrate: MB.QUALITY_VERY_HIGH || MB.QUALITY_HIGH });
+      output.addVideoTrack(source, { frameRate: fps });
+      await output.start();
+
+      var sink = new MB.VideoSampleSink(track), t0 = null, n = 0;
+      for await (var sample of sink.samples()) {
+        if (t0 === null) t0 = sample.timestamp;
+        var frame = sample.toVideoFrame();
+        draw(ctx, L, k, { el: frame, w: sample.displayWidth, h: sample.displayHeight });
+        frame.close();
+        await source.add(sample.timestamp - t0, sample.duration || 1 / fps);
+        sample.close();
+        if (++n % 10 === 0) setProgress('' + Math.min(100, Math.round((sample.timestamp - t0) / duration * 100)) + '%');
+      }
+      await output.finalize();
+      download(new Blob([target.buffer], { type: 'video/mp4' }), baseName() + '.mp4');
+      finishExport('MP4 saved');
+    } catch (e) {
+      console.error(e);
+      finishExport('Couldn’t export: ' + (e && e.message ? e.message : 'unknown error'));
+    }
+  }
+
+  // Fallback: record the canvas while the video plays once (real time, no audio).
+  function exportVideoRecorder() {
+    if (!window.MediaRecorder) { finishExport('This browser can’t export video'); return; }
+    var types = ['video/mp4;codecs=avc1.640028', 'video/mp4;codecs=avc1', 'video/webm;codecs=vp9', 'video/webm'];
+    var type = types.filter(function (t) { return MediaRecorder.isTypeSupported(t); })[0];
+    if (!type) { finishExport('This browser can’t export video'); return; }
+    var mp4 = type.indexOf('mp4') > -1, v = src.el, cv = $('canvas');
+    var rec = new MediaRecorder(cv.captureStream(30), { mimeType: type, videoBitsPerSecond: 16e6 }), chunks = [];
+    rec.ondataavailable = function (e) { if (e.data.size) chunks.push(e.data); };
+    rec.onstop = function () {
+      clearInterval(tick); v.loop = true; v.play().catch(function () {});
+      download(new Blob(chunks, { type: type.split(';')[0] }), baseName() + (mp4 ? '.mp4' : '.webm'));
+      finishExport(mp4 ? 'MP4 saved (recorded in real time)' : 'Your browser can’t make MP4 — saved WebM instead');
+    };
+    v.pause(); v.loop = false; v.currentTime = 0;
+    v.addEventListener('seeked', function () {
+      rec.start(250); v.play();
+      v.addEventListener('ended', function () { rec.stop(); }, { once: true });
+    }, { once: true });
+    var tick = setInterval(function () { setProgress(Math.floor(v.currentTime) + 's / ' + Math.round(v.duration) + 's'); }, 250);
+  }
+
+  // ---- HTML snippet: frame the original file with CSS on your own page (no re-encoding) ----
+  function snippet() {
+    var name = src.name || (src.kind === 'video' ? 'video.mp4' : 'image.png');
+    // escape the file name so odd characters (quotes, <, &) can't break or inject into the snippet
+    name = name.replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; });
+    var media = src.kind === 'video'
+      ? '<video src="' + name + '" autoplay muted loop playsinline></video>'
+      : '<img src="' + name + '" alt="">';
+    if (opts.frame === 'iphone') {
+      var W = src.w, H = Math.round(src.w * IPHONE_RATIO), pr = placeRect(src.w, src.h, W, H);
+      var pct = function (n, d) { return +(n / d * 100).toFixed(3) + '%'; };
+      var st = ' style="left: ' + pct(pr.dx, W) + '; top: ' + pct(pr.dy, H) + '; width: ' + pct(pr.dw, W) + '; height: ' + pct(pr.dh, H) + ';"';
+      media = media.replace(/^<(video|img)/, '<$1' + st);
+    }
+    var shadow = opts.shadow === 'on' ? '\n  filter: drop-shadow(0 4px 16px rgba(0, 0, 0, 0.06));' : '';
+    if (opts.frame === 'mac') {
+      var dark = opts.macTheme === 'dark';
+      return '<style>\n' +
+        '.device-desktop {\n  display: inline-block; max-width: 100%; border-radius: 10px; overflow: hidden;\n' +
+        '  border: 1px solid ' + (dark ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.14)') + '; background: ' + (dark ? '#2c2c2e' : '#ebebeb') + ';' + shadow + '\n}\n' +
+        '.device-desktop .bar {\n  height: 28px; display: flex; align-items: center; gap: 8px; padding: 0 14px;\n' +
+        '  border-bottom: 1px solid ' + (dark ? 'rgba(0, 0, 0, 0.45)' : 'rgba(0, 0, 0, 0.10)') + ';\n}\n' +
+        '.device-desktop .bar i { width: 12px; height: 12px; border-radius: 50%; box-shadow: inset 0 0 0 0.5px rgba(0, 0, 0, 0.12); }\n' +
+        '.device-desktop .bar i:nth-child(1) { background: #ff5f57; }\n.device-desktop .bar i:nth-child(2) { background: #febc2e; }\n.device-desktop .bar i:nth-child(3) { background: #28c840; }\n' +
+        '.device-desktop img, .device-desktop video { display: block; width: 100%; height: auto; }\n</style>\n\n' +
+        '<figure class="device-desktop" style="margin: 0;">\n  <div class="bar"><i></i><i></i><i></i></div>\n  ' + media + '\n</figure>\n';
+    }
+    // iPhone: sized by the frame width; everything else scales with it (container query units)
+    return '<style>\n' +
+      '.device-mobile { --w: 320px; width: var(--w); max-width: 100%; container-type: inline-size; }\n' +
+      '.device-mobile .frame {\n  box-sizing: border-box; padding: 2.878cqw; border-radius: 14.39cqw; background: #0b0b0c;\n' +
+      '  box-shadow: inset 0 0 0 0.36cqw #3a3a3d;' + shadow + '\n}\n' +
+      '.device-mobile .screen { position: relative; aspect-ratio: 1179 / 2556; border-radius: 11.51cqw; overflow: hidden; background: #000; }\n' +
+      '.device-mobile .screen::after {\n  content: ""; position: absolute; top: 2.64cqw; left: 50%; transform: translateX(-50%);\n' +
+      '  width: 29.74cqw; height: 8.63cqw; border-radius: 999px; background: #000;\n}\n' +
+      '.device-mobile img, .device-mobile video { position: absolute; display: block; max-width: none; }\n</style>\n\n' +
+      '<figure class="device-mobile" style="margin: 0;">\n  <div class="frame"><div class="screen">' + media + '</div></div>\n</figure>\n';
+  }
+  function copySnippet() {
+    var text = snippet();
+    var done = function () { toast('HTML copied — put ' + (src.name || 'the file') + ' next to your page'); };
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(done, fallback); else fallback();
+    function fallback() {
+      var ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta); ta.select();
+      try { document.execCommand('copy'); done(); } catch (e) { toast('Copy failed'); } ta.remove();
+    }
+  }
+
+  function init() {
+    load(); syncUI();
+    function phoneDims() { return { W: src.w, H: Math.round(src.w * IPHONE_RATIO) }; }
+    $('zoomRange').addEventListener('input', function () {
+      var d = phoneDims(); place.zoom = sliderToZoom(+this.value, fitZoom(src.w, src.h, d.W, d.H)); syncUI();
+    });
+    $('contentSel').addEventListener('change', function () {
+      var d = phoneDims();
+      if (this.value === 'fit') place = { zoom: fitZoom(src.w, src.h, d.W, d.H), px: 0.5, py: 0.5 };
+      else if (this.value === 'fill') place = { zoom: 1, px: 0.5, py: 0 };
+      syncUI();
+    });
+    // drag the preview to move the content inside the screen
+    var drag = null, cv = $('canvas');
+    cv.addEventListener('pointerdown', function (e) {
+      if (!src || opts.frame !== 'iphone' || recording) return;
+      drag = { x: e.clientX, y: e.clientY, px: place.px, py: place.py };
+      cv.setPointerCapture(e.pointerId); $('preview').classList.add('panning');
+    });
+    cv.addEventListener('pointermove', function (e) {
+      if (!drag) return;
+      var L = layout(), k = cv.width / cv.clientWidth / outScale(L, src.kind === 'video' ? MAX_VID : MAX_IMG);
+      var pr = placeRect(src.w, src.h, L.screenW, L.screenH);
+      var ox = L.screenW - pr.dw, oy = L.screenH - pr.dh;           // overflow (negative when content is larger)
+      if (Math.abs(ox) > 0.5) place.px = Math.min(1, Math.max(0, drag.px + (e.clientX - drag.x) * k / ox));
+      if (Math.abs(oy) > 0.5) place.py = Math.min(1, Math.max(0, drag.py + (e.clientY - drag.y) * k / oy));
+      render();
+    });
+    var endDrag = function () { if (!drag) return; drag = null; $('preview').classList.remove('panning'); syncUI(); };
+    cv.addEventListener('pointerup', endDrag); cv.addEventListener('pointercancel', endDrag);
+
+    document.querySelectorAll('select[data-opt]').forEach(function (el) {
+      el.addEventListener('change', function () { if (recording) return; opts[el.dataset.opt] = el.value; save(); syncUI(); });
+    });
+    [$('openBtn'), $('openBtn2')].forEach(function (b) { b.addEventListener('click', function () { $('fileInput').click(); }); });
+    $('fileInput').addEventListener('change', function (e) { setSource(e.target.files[0]); e.target.value = ''; });
+    $('exportBtn').addEventListener('click', function () { if (!src || recording) return; src.kind === 'video' ? exportVideo() : exportPng(); });
+    $('copyBtn').addEventListener('click', function () { if (src && !recording) copySnippet(); });
+
+    var isMac = /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent), mod = isMac ? '⌘' : 'Ctrl+';
+    document.querySelectorAll('kbd.sc').forEach(function (k) { k.textContent = mod + k.dataset.keys; });
+    $('openBtn').title = 'Open an image or video (' + mod + 'O)';
+    document.addEventListener('keydown', function (e) {
+      if ((e.metaKey || e.ctrlKey) && !e.altKey && !e.shiftKey && e.key.toLowerCase() === 'o') { e.preventDefault(); $('fileInput').click(); }
+    });
+    document.addEventListener('paste', function (e) {
+      var items = (e.clipboardData || {}).items || [];
+      for (var i = 0; i < items.length; i++) if (items[i].kind === 'file') { e.preventDefault(); setSource(items[i].getAsFile()); return; }
+    });
+    var depth = 0;
+    document.addEventListener('dragenter', function (e) { e.preventDefault(); depth++; document.body.classList.add('dragging'); });
+    document.addEventListener('dragleave', function () { depth = Math.max(0, depth - 1); if (!depth) document.body.classList.remove('dragging'); });
+    document.addEventListener('dragover', function (e) { e.preventDefault(); });
+    document.addEventListener('drop', function (e) {
+      e.preventDefault(); depth = 0; document.body.classList.remove('dragging');
+      if (e.dataTransfer.files[0]) setSource(e.dataTransfer.files[0]);
+    });
+  }
+  document.addEventListener('DOMContentLoaded', init);
+})();
+</script>
+</body>
+</html>
